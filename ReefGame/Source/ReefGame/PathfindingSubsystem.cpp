@@ -83,51 +83,6 @@ void UPathfindingSubsystem::PlaceProceduralNodes(const TArray<FVector>& Landscap
                         CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index - MapWidth + 1]);
                     if (X != 0 && Y != 0) // Down-Left
                         CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index - MapWidth - 1]);
-
-                    // 3D Diagonal Connections (X, Y, Z)
-                    if (Z != MapDepth - 1) // Diagonals in the Z+1 layer (Up in Z-axis)
-                    {
-                        if (X != MapWidth - 1) // Right
-                            CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index + MapWidth * MapHeight + 1]);
-                        if (X != 0) // Left
-                            CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index + MapWidth * MapHeight - 1]);
-                        if (Y != MapHeight - 1) // Up
-                            CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index + MapWidth * MapHeight + MapWidth]);
-                        if (Y != 0) // Down
-                            CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index + MapWidth * MapHeight - MapWidth]);
-
-                        // 3D diagonals within the Z+1 layer (e.g., X±1, Y±1, Z+1)
-                        if (X != MapWidth - 1 && Y != MapHeight - 1) // Up-Right
-                            CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index + MapWidth * MapHeight + MapWidth + 1]);
-                        if (X != 0 && Y != MapHeight - 1) // Up-Left
-                            CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index + MapWidth * MapHeight + MapWidth - 1]);
-                        if (X != MapWidth - 1 && Y != 0) // Down-Right
-                            CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index + MapWidth * MapHeight - MapWidth + 1]);
-                        if (X != 0 && Y != 0) // Down-Left
-                            CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index + MapWidth * MapHeight - MapWidth - 1]);
-                    }
-
-                    if (Z != 0) // Diagonals in the Z-1 layer (Down in Z-axis)
-                    {
-                        if (X != MapWidth - 1) // Right
-                            CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index - MapWidth * MapHeight + 1]);
-                        if (X != 0) // Left
-                            CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index - MapWidth * MapHeight - 1]);
-                        if (Y != MapHeight - 1) // Up
-                            CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index - MapWidth * MapHeight + MapWidth]);
-                        if (Y != 0) // Down
-                            CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index - MapWidth * MapHeight - MapWidth]);
-
-                        // 3D diagonals within the Z-1 layer (e.g., X±1, Y±1, Z-1)
-                        if (X != MapWidth - 1 && Y != MapHeight - 1) // Up-Right
-                            CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index - MapWidth * MapHeight + MapWidth + 1]);
-                        if (X != 0 && Y != MapHeight - 1) // Up-Left
-                            CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index - MapWidth * MapHeight + MapWidth - 1]);
-                        if (X != MapWidth - 1 && Y != 0) // Down-Right
-                            CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index - MapWidth * MapHeight - MapWidth + 1]);
-                        if (X != 0 && Y != 0) // Down-Left
-                            CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index - MapWidth * MapHeight - MapWidth - 1]);
-                    }
 					
 				}
 			}

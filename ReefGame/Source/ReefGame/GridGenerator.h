@@ -36,7 +36,7 @@ protected:
 	int32 Height = 10;
 
 	UPROPERTY(EditAnywhere)
-	int32 Depth = 10;
+	int32 Depth = 5;
 
 	UPROPERTY(EditAnywhere)
 	float VertexSpacing = 1000.0f;

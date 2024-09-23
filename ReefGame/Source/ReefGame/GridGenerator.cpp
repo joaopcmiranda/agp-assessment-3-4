@@ -25,7 +25,8 @@ bool AGridGenerator::ShouldTickIfViewportsOnly() const
 void AGridGenerator::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
+	CreateGrid();
 }
 
 void AGridGenerator::CreateGrid()
@@ -62,7 +63,6 @@ void AGridGenerator::CreateGrid()
 void AGridGenerator::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-
 }
 
 void AGridGenerator::ClearLandscape()

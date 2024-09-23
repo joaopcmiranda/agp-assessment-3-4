@@ -44,4 +44,4 @@ private:
 	TArray<FVector> GetPath(ANavigationNode* StartNode, ANavigationNode* EndNode);
 	static TArray<FVector> ReconstructPath(const TMap<ANavigationNode*, ANavigationNode*>& CameFromMap, ANavigationNode* EndNode);
 	
-};
+}; 
