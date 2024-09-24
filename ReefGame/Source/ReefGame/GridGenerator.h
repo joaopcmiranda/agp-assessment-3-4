@@ -23,6 +23,8 @@ protected:
 
 	void CreateGrid();
 
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+
 	UPROPERTY()
 	TArray<FVector> Vertices;
     
@@ -40,6 +42,8 @@ protected:
 
 	UPROPERTY(EditAnywhere)
 	float VertexSpacing = 1000.0f;
+
+	void OnConstruction(const FTransform& Transform);
 
 public:	
 	// Called every frame

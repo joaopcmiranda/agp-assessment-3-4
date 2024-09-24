@@ -3,8 +3,9 @@
 
 #include "GridGenerator.h"
 #include "Kismet/KismetSystemLibrary.h"
-//#include "KismetProceduralMeshLibrary.h"
 #include "PathfindingSubsystem.h"
+#include "NavigationNode.h"
+#include "DrawDebugHelpers.h"
 #include "NavigationSystemTypes.h"
 #include "VectorTypes.h"
 
@@ -13,7 +14,7 @@ AGridGenerator::AGridGenerator()
 {
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
-
+	bAllowTickBeforeBeginPlay = true;
 }
 
 bool AGridGenerator::ShouldTickIfViewportsOnly() const
@@ -21,17 +22,19 @@ bool AGridGenerator::ShouldTickIfViewportsOnly() const
 	return true;
 }
 
+
+
 // Called when the game starts or when spawned
 void AGridGenerator::BeginPlay()
 {
 	Super::BeginPlay();
-
-	CreateGrid();
 }
 
 void AGridGenerator::CreateGrid()
 {
 	UWorld* World = GetWorld();
+
+	ClearLandscape();
 	
 	for (int32 Z = 0; Z < Depth; Z++)
 	{
@@ -59,6 +62,24 @@ void AGridGenerator::CreateGrid()
 	
 }
 
+#if WITH_EDITOR
+void AGridGenerator::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+
+	// Regenerate the grid when properties like Width, Height, Depth, or VertexSpacing change
+	CreateGrid();
+}
+#endif
+
+
+void AGridGenerator::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+
+	CreateGrid();
+}
+
 // Called every frame
 void AGridGenerator::Tick(float DeltaTime)
 {
@@ -67,7 +88,12 @@ void AGridGenerator::Tick(float DeltaTime)
 
 void AGridGenerator::ClearLandscape()
 {
+	UWorld* World = GetWorld();
+
+	// Clear any existing vertices and UV coordinates
 	Vertices.Empty();
 	UVCoords.Empty();
-	UKismetSystemLibrary::FlushPersistentDebugLines(GetWorld());
+    
+	// Flush debug lines
+	UKismetSystemLibrary::FlushPersistentDebugLines(World);
 }

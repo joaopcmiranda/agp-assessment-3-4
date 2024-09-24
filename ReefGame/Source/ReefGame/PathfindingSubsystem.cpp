@@ -1,7 +1,9 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
+
 #include "PathfindingSubsystem.h"
+#include "Kismet/KismetSystemLibrary.h"
 #include "EngineUtils.h"
 #include "NavigationNode.h"
 
@@ -28,6 +30,16 @@ TArray<FVector> UPathfindingSubsystem::GetPathAway(const FVector& StartLocation,
 void UPathfindingSubsystem::PlaceProceduralNodes(const TArray<FVector>& LandscapeVertexData, int32 MapWidth,
 	int32 MapHeight, int32 MapDepth)
 {
+	for (ANavigationNode* Node : ProcedurallyPlacedNodes)
+	{
+		if (Node && Node->IsValidLowLevel())
+		{
+			Node->Destroy();
+		}
+	}
+
+	ProcedurallyPlacedNodes.Empty();
+	Nodes.Empty();
 
 	for (int Z =0; Z < MapDepth; Z++)
 	{
@@ -42,6 +54,14 @@ void UPathfindingSubsystem::PlaceProceduralNodes(const TArray<FVector>& Landscap
 					ProcedurallyPlacedNodes.Add(Node);
 				}
 			}
+		}
+	}
+
+	for (ANavigationNode* Node : ProcedurallyPlacedNodes)
+	{
+		if (Node)
+		{
+			Node->ConnectedNodes.Empty();  // Clear previous connections
 		}
 	}
 	
@@ -71,18 +91,6 @@ void UPathfindingSubsystem::PlaceProceduralNodes(const TArray<FVector>& Landscap
 						CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index + MapWidth * MapHeight]);
 					if (Z != 0) // Backward (Down in Z-axis)
 						CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index - MapWidth * MapHeight]);
-
-					// Diagonal connections
-					
-					// 2D Diagonal Connections (X, Y)
-                    if (X != MapWidth - 1 && Y != MapHeight - 1) // Up-Right
-                        CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index + MapWidth + 1]);
-                    if (X != 0 && Y != MapHeight - 1) // Up-Left
-                        CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index + MapWidth - 1]);
-                    if (X != MapWidth - 1 && Y != 0) // Down-Right
-                        CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index - MapWidth + 1]);
-                    if (X != 0 && Y != 0) // Down-Left
-                        CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index - MapWidth - 1]);
 					
 				}
 			}

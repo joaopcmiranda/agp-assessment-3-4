@@ -31,6 +31,8 @@ public:
 
 protected:
 
+	friend class AGridGenerator;
+
 	TArray<ANavigationNode*> Nodes;
 
 	TArray<ANavigationNode*> ProcedurallyPlacedNodes;

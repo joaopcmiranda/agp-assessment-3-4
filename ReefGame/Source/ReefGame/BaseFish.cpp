@@ -43,6 +43,9 @@ void ABaseFish::MoveAlongPath()
 	FVector MovementDirection = CurrentPath[CurrentPath.Num()-1] - GetActorLocation();
 	MovementDirection.Normalize();
 	AddMovementInput(MovementDirection);
+
+	SmoothMovement(CurrentPath[CurrentPath.Num() - 1], GetWorld()->GetDeltaSeconds());
+	
 	if (FVector::Distance(GetActorLocation(), CurrentPath[CurrentPath.Num() - 1]) < PathfindingError)
 	{
 		CurrentPath.Pop();
@@ -86,6 +89,7 @@ void ABaseFish::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 
 	UpdateSight();
+	TickSwim();
 	
 	/*switch(CurrentState)
 	{
@@ -104,6 +108,13 @@ void ABaseFish::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
+}
+
+// Smooth movement in 3D
+void ABaseFish::SmoothMovement(FVector TargetLocation, float DeltaTime)
+{
+	FVector SmoothedDirection = FMath::VInterpTo(GetActorLocation(), TargetLocation, DeltaTime, 0.5f); // Smooth factor can be adjusted
+	SetActorLocation(SmoothedDirection);
 }
 	
 
