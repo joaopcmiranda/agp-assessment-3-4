@@ -14,6 +14,7 @@ UENUM(BlueprintType)
 enum class EFishState : uint8
 {
 	Swim,
+	SwimGroup,
 	Evade
 };
 

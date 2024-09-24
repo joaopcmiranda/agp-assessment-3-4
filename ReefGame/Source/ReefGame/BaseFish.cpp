@@ -89,9 +89,8 @@ void ABaseFish::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 
 	UpdateSight();
-	TickSwim();
 	
-	/*switch(CurrentState)
+	switch(CurrentState)
 	{
 	case EFishState::Swim:
 		TickSwim();
@@ -100,7 +99,11 @@ void ABaseFish::Tick(float DeltaTime)
 			//do something
 		}
 		break;
-	}*/
+	case EFishState::SwimGroup:
+		
+		break;
+			
+	}
 }
 
 // Called to bind functionality to input
@@ -113,8 +116,23 @@ void ABaseFish::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 // Smooth movement in 3D
 void ABaseFish::SmoothMovement(FVector TargetLocation, float DeltaTime)
 {
-	FVector SmoothedDirection = FMath::VInterpTo(GetActorLocation(), TargetLocation, DeltaTime, 0.5f); // Smooth factor can be adjusted
-	SetActorLocation(SmoothedDirection);
+	float MaxSpeed = 300.0f;   // Max movement speed
+	float MinSpeed = 50.0f;    // Minimum speed, ensuring continuous movement
+	float DistanceThreshold = 200.0f;  // Distance within which fish will start decelerating
+	
+	FVector CurrentLocation = GetActorLocation();
+	FVector Direction = (TargetLocation - CurrentLocation).GetSafeNormal();  // Movement direction
+	
+	float DistanceToTarget = FVector::Distance(CurrentLocation, TargetLocation);
+	float Speed = MaxSpeed;
+	
+	if (DistanceToTarget < DistanceThreshold)
+	{
+		Speed = FMath::Lerp(MinSpeed, MaxSpeed, DistanceToTarget / DistanceThreshold);
+	}
+	
+	FVector MovementDelta = Direction * Speed * DeltaTime;
+	SetActorLocation(CurrentLocation + MovementDelta);
 }
 	
 
