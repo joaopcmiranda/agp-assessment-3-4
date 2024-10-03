@@ -28,75 +28,97 @@ TArray<FVector> UPathfindingSubsystem::GetPathAway(const FVector& StartLocation,
 }
 
 void UPathfindingSubsystem::PlaceProceduralNodes(const TArray<FVector>& LandscapeVertexData, int32 MapWidth,
-	int32 MapHeight, int32 MapDepth)
+    int32 MapHeight, int32 MapDepth)
 {
-	for (ANavigationNode* Node : ProcedurallyPlacedNodes)
-	{
-		if (Node && Node->IsValidLowLevel())
-		{
-			Node->Destroy();
-		}
-	}
+    for (ANavigationNode* Node : ProcedurallyPlacedNodes)
+    {
+        if (Node && Node->IsValidLowLevel())
+        {
+            Node->Destroy();
+        }
+    }
 
-	ProcedurallyPlacedNodes.Empty();
-	Nodes.Empty();
+    ProcedurallyPlacedNodes.Empty();
+    Nodes.Empty();
 
-	for (int Z =0; Z < MapDepth; Z++)
-	{
-		for (int Y = 0; Y < MapHeight; Y++)
-		{
-			for (int X = 0; X < MapWidth; X++)
-			{
-				if (ANavigationNode* Node = GetWorld()->SpawnActor<ANavigationNode>())
-				{
-					int32 Index = Z * MapWidth * MapHeight + Y * MapWidth + X;
-					Node->SetActorLocation(LandscapeVertexData[Index]);
-					ProcedurallyPlacedNodes.Add(Node);
-				}
-			}
-		}
-	}
+    for (int Z = 0; Z < MapDepth; Z++)
+    {
+        for (int Y = 0; Y < MapHeight; Y++)
+        {
+            for (int X = 0; X < MapWidth; X++)
+            {
+                if (ANavigationNode* Node = GetWorld()->SpawnActor<ANavigationNode>())
+                {
+                    int32 Index = Z * MapWidth * MapHeight + Y * MapWidth + X;
+                    Node->SetActorLocation(LandscapeVertexData[Index]);
+                    ProcedurallyPlacedNodes.Add(Node);
+                }
+            }
+        }
+    }
 
-	for (ANavigationNode* Node : ProcedurallyPlacedNodes)
-	{
-		if (Node)
-		{
-			Node->ConnectedNodes.Empty();  // Clear previous connections
-		}
-	}
-	
-	for (int Z =0; Z < MapDepth; Z++)
-	{
-		for (int Y = 0; Y < MapHeight; Y++)
-		{
-			for (int X = 0; X < MapWidth; X++)
-			{
-				int32 Index = Z * MapWidth * MapHeight + Y * MapWidth + X;
-				if (ANavigationNode* CurrentNode = ProcedurallyPlacedNodes[Index])
-				{
-					// X axis neighbors
-					if (X != MapWidth - 1) // Right
-						CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index + 1]);
-					if (X != 0) // Left
-						CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index - 1]);
+    for (ANavigationNode* Node : ProcedurallyPlacedNodes)
+    {
+        if (Node)
+        {
+            Node->ConnectedNodes.Empty();  // Clear previous connections
+        }
+    }
 
-					// Y axis neighbors
-					if (Y != MapHeight - 1) // Up
-						CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index + MapWidth]);
-					if (Y != 0) // Down
-						CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index - MapWidth]);
+    for (int Z = 0; Z < MapDepth; Z++)
+    {
+        for (int Y = 0; Y < MapHeight; Y++)
+        {
+            for (int X = 0; X < MapWidth; X++)
+            {
+                int32 Index = Z * MapWidth * MapHeight + Y * MapWidth + X;
+                if (ANavigationNode* CurrentNode = ProcedurallyPlacedNodes[Index])
+                {
+                    // X axis neighbors
+                    if (X != MapWidth - 1) // Right
+                        CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index + 1]);
+                    if (X != 0) // Left
+                        CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index - 1]);
 
-					// Z axis neighbors
-					if (Z != MapDepth - 1) // Forward (Up in Z-axis)
-						CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index + MapWidth * MapHeight]);
-					if (Z != 0) // Backward (Down in Z-axis)
-						CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index - MapWidth * MapHeight]);
-					
-				}
-			}
-		}
-	}
+                    // Y axis neighbors
+                    if (Y != MapHeight - 1) // Up
+                        CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index + MapWidth]);
+                    if (Y != 0) // Down
+                        CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index - MapWidth]);
+
+                    // Z axis neighbors
+                    if (Z != MapDepth - 1) // Forward (Up in Z-axis)
+                        CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index + MapWidth * MapHeight]);
+                    if (Z != 0) // Backward (Down in Z-axis)
+                        CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index - MapWidth * MapHeight]);
+
+                    // Add diagonal neighbors selectively (only for performance-sensitive areas)
+                    if (FMath::RandRange(0, 100) < 20)  // 20% chance to add diagonal connection
+                    {
+                        // Diagonal in the XY plane (Up-Right, Down-Left, etc.)
+                        if (X != MapWidth - 1 && Y != MapHeight - 1)
+                            CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index + 1 + MapWidth]); // Up-Right
+                        if (X != 0 && Y != 0)
+                            CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index - 1 - MapWidth]); // Down-Left
+
+                        if (X != MapWidth - 1 && Y != 0)
+                            CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index + 1 - MapWidth]); // Down-Right
+                        if (X != 0 && Y != MapHeight - 1)
+                            CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index - 1 + MapWidth]); // Up-Left
+
+                        // Diagonal in the Z axis (XY and Z-axis combined)
+                        if (Z != MapDepth - 1 && X != MapWidth - 1 && Y != MapHeight - 1)
+                            CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index + 1 + MapWidth + (MapWidth * MapHeight)]); // Up-Right and Forward
+                        
+                        if (Z != 0 && X != 0 && Y != 0)
+                            CurrentNode->ConnectedNodes.Add(ProcedurallyPlacedNodes[Index - 1 - MapWidth - (MapWidth * MapHeight)]); // Down-Left and Backward
+                    }
+                }
+            }
+        }
+    }
 }
+
 
 TArray<FVector> UPathfindingSubsystem::GetWaypointPositions()
 {

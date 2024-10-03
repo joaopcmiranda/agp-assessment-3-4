@@ -7,8 +7,9 @@
 #include "BaseFish.generated.h"
 
 class UHealthComponent;
-class UPawnSensingComponent;
+class AFishSchoolController;
 class UPathfindingSubsystem;
+class ABaseSchool;
 
 UENUM(BlueprintType)
 enum class EFishState : uint8
@@ -31,20 +32,28 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
+	UPROPERTY(EditAnywhere)
+	float SensingRadius = 2000.0f;
+
 	void MoveAlongPath();
 
 	void TickSwim();
 
-	UFUNCTION()
-	void OnSensedPawn(APawn* SensedActor);
+	void CheckForNearbyFish();
 
-	void UpdateSight();
+	UPROPERTY()
+	AFishSchoolController* FishSchoolController = nullptr;
+
+	//UFUNCTION()
+	//void OnSensedPawn(APawn* SensedActor);
+
+	//void UpdateSight();
 
 	UPROPERTY()
 	UPathfindingSubsystem* PathfindingSubsystem;
 
-	UPROPERTY(VisibleAnywhere)
-	UPawnSensingComponent* PawnSensingComponent;
+	//UPROPERTY(VisibleAnywhere)
+	//UPawnSensingComponent* PawnSensingComponent;
 
 	UPROPERTY()
 	ABaseFish* SensedFish = nullptr;
@@ -60,6 +69,16 @@ protected:
 
 	UPROPERTY(VisibleAnywhere)
 	UHealthComponent* HealthComponent;
+
+	void AddFishToSchool();
+
+	bool bIsInSchool = false;
+
+	UPROPERTY()
+	ABaseSchool* SchoolFishIsIn = nullptr;
+
+	float LastSensedTime = 0.0f;
+	float SensingCooldown = 1.0f;
 
 public:	
 	// Called every frame

@@ -5,6 +5,8 @@
 #include "HealthComponent.h"
 #include "PathfindingSubsystem.h"
 #include "Perception/PawnSensingComponent.h"
+#include "FishSchoolController.h"
+#include "EngineUtils.h"
 
 // Sets default values
 ABaseFish::ABaseFish()
@@ -13,7 +15,7 @@ ABaseFish::ABaseFish()
 	PrimaryActorTick.bCanEverTick = true;
 
 	HealthComponent = CreateDefaultSubobject<UHealthComponent>("Health Component");
-	PawnSensingComponent = CreateDefaultSubobject<UPawnSensingComponent>("Pawn Sensing Component");
+	//PawnSensingComponent = CreateDefaultSubobject<UPawnSensingComponent>("Pawn Sensing Component");
 }
 
 // Called when the game starts or when spawned
@@ -29,9 +31,11 @@ void ABaseFish::BeginPlay()
 	{
 		UE_LOG(LogTemp, Error, TEXT("Unable to find the PathfindingSubsystem"))
 	}
-	if (PawnSensingComponent)
+
+	for (TActorIterator<AFishSchoolController> It(GetWorld()); It; ++It)
 	{
-		PawnSensingComponent->OnSeePawn.AddDynamic(this, &ABaseFish::OnSensedPawn);
+		FishSchoolController = *It;
+		break;
 	}
 	
 }
@@ -61,25 +65,56 @@ void ABaseFish::TickSwim()
 	MoveAlongPath();
 }
 
-void ABaseFish::OnSensedPawn(APawn* SensedActor)
+void ABaseFish::CheckForNearbyFish()
 {
-	if (ABaseFish* OtherFish = Cast<ABaseFish>(SensedActor))
+	UWorld* World = GetWorld();
+	if (!World) return;
+
+	if (!FishSchoolController) return;
+
+	float CurrentTime = World->GetTimeSeconds();
+    
+	// Check if the cooldown period has passed
+	if (CurrentTime - LastSensedTime < SensingCooldown)
 	{
-		SensedFish = OtherFish;
-		UE_LOG(LogTemp, Display, TEXT("Sensed Fish"))
+		return;
+	}
+
+	// Access Fish array from the FishSchoolController
+	for (ABaseFish* OtherFish : FishSchoolController->Fish)
+	{
+		if (OtherFish == this) continue;
+
+		float DistanceToFish = FVector::Dist(GetActorLocation(), OtherFish->GetActorLocation());
+
+		if (DistanceToFish <= SensingRadius)
+		{
+			UE_LOG(LogTemp, Display, TEXT("Detected nearby fish: %s"), *OtherFish->GetName());
+
+			SensedFish = OtherFish;
+			CurrentState = EFishState::SwimGroup;
+
+			// Update the time this fish last sensed another fish
+			LastSensedTime = CurrentTime;
+
+			// You could break here if you only want to detect one fish, or keep looking for more
+			break;
+		}
 	}
 }
 
-void ABaseFish::UpdateSight()
+void ABaseFish::AddFishToSchool()
 {
-	if (!SensedFish) return;
-	if (PawnSensingComponent)
+	if (SensedFish->bIsInSchool)
 	{
-		if (!PawnSensingComponent->HasLineOfSightTo(SensedFish))
-		{
-			SensedFish = nullptr;
-			UE_LOG(LogTemp, Display, TEXT("Lost Fish"))
-		}
+		ABaseSchool* School = SensedFish->SchoolFishIsIn;
+		School->AddFishToSchool(this);
+		
+	}
+	else //no school exists
+	{
+		ABaseSchool* School = FishSchoolController->CreateSchool(SensedFish->GetActorLocation());
+		School->AddFishToSchool(this);
 	}
 }
 
@@ -88,7 +123,7 @@ void ABaseFish::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	UpdateSight();
+	CheckForNearbyFish();
 	
 	switch(CurrentState)
 	{
@@ -96,7 +131,19 @@ void ABaseFish::Tick(float DeltaTime)
 		TickSwim();
 		if (SensedFish)
 		{
-			//do something
+			CurrentPath.Empty();
+			CurrentPath = PathfindingSubsystem->GetPath(GetActorLocation(), SensedFish->GetActorLocation());
+			MoveAlongPath();
+
+			float DistanceToSensedFish = FVector::Distance(GetActorLocation(), SensedFish->GetActorLocation());
+			float AttachmentDistanceThreshold = 100.0f;
+
+			// If close enough, attach to the sensed fish and change state to SwimGroup
+			if (DistanceToSensedFish < AttachmentDistanceThreshold)
+			{
+				AddFishToSchool();
+				CurrentState = EFishState::SwimGroup;
+			}
 		}
 		break;
 	case EFishState::SwimGroup:
