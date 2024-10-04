@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-#include "BaseFish.h"
 #include "BaseSchool.h"
+#include "BaseFish.h"
 #include "PathfindingSubsystem.h"
 #include "EngineUtils.h"
 

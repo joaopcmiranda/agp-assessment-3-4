@@ -15,7 +15,6 @@ UENUM(BlueprintType)
 enum class EFishState : uint8
 {
 	Swim,
-	SwimGroup,
 	Evade
 };
 
@@ -35,56 +34,47 @@ protected:
 	UPROPERTY(EditAnywhere)
 	float SensingRadius = 2000.0f;
 
-	void MoveAlongPath();
-
 	void TickSwim();
 
 	void CheckForNearbyFish();
 
-	UPROPERTY()
-	AFishSchoolController* FishSchoolController = nullptr;
-
-	//UFUNCTION()
-	//void OnSensedPawn(APawn* SensedActor);
-
-	//void UpdateSight();
-
-	UPROPERTY()
-	UPathfindingSubsystem* PathfindingSubsystem;
-
-	//UPROPERTY(VisibleAnywhere)
-	//UPawnSensingComponent* PawnSensingComponent;
-
-	UPROPERTY()
-	ABaseFish* SensedFish = nullptr;
-
-	UPROPERTY(VisibleAnywhere)
-	TArray<FVector> CurrentPath;
-
 	UPROPERTY(EditAnywhere)
 	EFishState CurrentState = EFishState::Swim;
-
-	UPROPERTY(EditAnywhere)
-	float PathfindingError = 150.0f;
 
 	UPROPERTY(VisibleAnywhere)
 	UHealthComponent* HealthComponent;
 
-	void AddFishToSchool();
-
-	bool bIsInSchool = false;
-
-	UPROPERTY()
-	ABaseSchool* SchoolFishIsIn = nullptr;
-
 	float LastSensedTime = 0.0f;
 	float SensingCooldown = 1.0f;
 
-public:	
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
+	UPROPERTY()
+	TArray<ABaseFish*> FishInRadius;
 
-	// Called to bind functionality to input
-	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
-	void SmoothMovement(FVector TargetLocation, float DeltaTime);
+	UPROPERTY()
+	AFishSchoolController* FishSchoolController;
+
+	FVector Cohere();
+	FVector Separate();
+	FVector Align();
+
+	FVector FlockingSteering();
+
+	UPROPERTY()
+	float MaxForce = 50.0f;
+	UPROPERTY()
+	float MaxSpeed = 300.0f;
+	
+	FVector Acceleration = FVector::ZeroVector;
+
+	FVector RandomDirection = FVector::ZeroVector;
+	float LastDirectionChangeTime = 0.0f;
+	UPROPERTY(EditAnywhere)
+	float DirectionChangeInterval = 2.0f;
+
+public:	
+
+	virtual void Tick(float DeltaTime) override;
+	
+	void SmoothMovementInDirection(FVector Direction, float DeltaTime);
+	
 };
