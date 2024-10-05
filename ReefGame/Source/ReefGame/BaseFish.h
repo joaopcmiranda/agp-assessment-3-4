@@ -8,8 +8,8 @@
 
 class UHealthComponent;
 class AFishSchoolController;
-class UPathfindingSubsystem;
-class ABaseSchool;
+class UStaticMeshComponent;
+class USphereComponent;
 
 UENUM(BlueprintType)
 enum class EFishState : uint8
@@ -30,51 +30,68 @@ public:
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+	
+//Components
+	UPROPERTY(VisibleAnywhere)
+	USphereComponent* FishCollision;
 
-	UPROPERTY(EditAnywhere)
-	float SensingRadius = 2000.0f;
+	UPROPERTY(VisibleAnywhere)
+	UStaticMeshComponent* FishMesh;
 
-	void TickSwim();
-
-	void CheckForNearbyFish();
-
-	UPROPERTY(EditAnywhere)
-	EFishState CurrentState = EFishState::Swim;
+	UPROPERTY(VisibleAnywhere)
+	USphereComponent* PerceptionSensor;
 
 	UPROPERTY(VisibleAnywhere)
 	UHealthComponent* HealthComponent;
 
-	float LastSensedTime = 0.0f;
-	float SensingCooldown = 1.0f;
+//Current state	
+	UPROPERTY(EditAnywhere)
+	EFishState CurrentState = EFishState::Swim;
 
-	UPROPERTY()
-	TArray<ABaseFish*> FishInRadius;
-
+//School controller	
 	UPROPERTY()
 	AFishSchoolController* FishSchoolController;
 
-	FVector Cohere();
-	FVector Separate();
-	FVector Align();
+//Movement
 
-	FVector FlockingSteering();
-
-	UPROPERTY()
-	float MaxForce = 50.0f;
-	UPROPERTY()
-	float MaxSpeed = 300.0f;
+	FVector Velocity = FVector(1.0f, 0.0f, 0.0f) * MinSpeed;
+	FRotator CurrentRotation;
 	
-	FVector Acceleration = FVector::ZeroVector;
+	float MaxSpeed = 1000.0f;
+	float MinSpeed = 500.0f;
 
-	FVector RandomDirection = FVector::ZeroVector;
-	float LastDirectionChangeTime = 0.0f;
-	UPROPERTY(EditAnywhere)
-	float DirectionChangeInterval = 2.0f;
+//MovementFunctions	
+
+	void UpdateMeshRotation();
+
+	FVector Cohere(TArray<AActor*> School);
+	FVector Separate(TArray<AActor*> School);
+	FVector Align(TArray<AActor*> School);
+
+	void Steer(float DeltaTime);
+	
+//Obstacle Avoidance
+
+	bool IsObstacle();
+	FVector AvoidObstacle();
+
+	TArray<FVector> TargetForces;
+
+//Perception
+	float FOV = FMath::Cos(FMath::DegreesToRadians(60.0f));
+	float FlockingDelay = 2.0f;
+
+
+//Weighting
+	float CoherenceStrength = 1.0f;
+	float SeparationStrength = 1.5f;
+	float AlignmentStrength = 1.0f;
+
 
 public:	
 
 	virtual void Tick(float DeltaTime) override;
 	
-	void SmoothMovementInDirection(FVector Direction, float DeltaTime);
+	void AddTargetForce(FVector TargetForce);
 	
 };
