@@ -21,19 +21,14 @@ public:
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
-
-public:	
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
-
-protected:
+	
 	UPROPERTY(EditAnywhere)
 	int32 NumFishToSpawn;
 	UPROPERTY(EditAnywhere)
 	float SpawnRadius;
 
 	UPROPERTY(EditAnywhere)
-	TSubclassOf<ABaseFish> FishType = ABaseFish::StaticClass();
+	TSubclassOf<ABaseFish> FishType;  
 
 	void SpawnFish(int32 NumFish);
 
