@@ -33,7 +33,7 @@ ABaseFish::ABaseFish()
 	PerceptionSensor->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	PerceptionSensor->SetCollisionResponseToAllChannels(ECR_Ignore);
 	PerceptionSensor->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
-	PerceptionSensor->SetSphereRadius(2000.0f);
+	PerceptionSensor->SetSphereRadius(500.0f);
 
 	//Set random initial velocity with random direction and speed.
 	float InitialSpeed = FMath::RandRange(MinSpeed, MaxSpeed);
@@ -181,10 +181,10 @@ void ABaseFish::Steer(float DeltaTime)
 	Acceleration += Align(Schoolmates);
 	Acceleration += Cohere(Schoolmates);
 
-	/*if (IsObstacle())
+	if (IsObstacle())
 	{
 		Acceleration += AvoidObstacle();
-	}*/
+	}
 
 	for (FVector TargetForce : TargetForces)
 	{
