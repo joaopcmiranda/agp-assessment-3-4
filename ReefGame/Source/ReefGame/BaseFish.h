@@ -54,7 +54,7 @@ protected:
 
 //Movement
 
-	FVector Velocity = FVector(1.0f, 0.0f, 0.0f) * MinSpeed;
+	FVector Velocity;
 	FRotator CurrentRotation;
 	
 	float MaxSpeed = 1000.0f;
@@ -78,8 +78,8 @@ protected:
 	TArray<FVector> TargetForces;
 
 //Perception
-	float FOV = FMath::Cos(FMath::DegreesToRadians(60.0f));
-	float FlockingDelay = 2.0f;
+	float FOV = FMath::Cos(FMath::DegreesToRadians(120.0f));
+	float FlockingDelay = 0.0f;
 
 
 //Weighting

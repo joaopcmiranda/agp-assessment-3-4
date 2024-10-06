@@ -16,10 +16,11 @@ ABaseFish::ABaseFish()
 	//setupcollision component and set as root
 	FishCollision = CreateDefaultSubobject<USphereComponent>(TEXT("Collision Component"));
 	RootComponent = FishCollision;
+	
 	FishCollision->SetCollisionObjectType(ECC_Pawn);
 	FishCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	FishCollision->SetCollisionResponseToAllChannels(ECR_Overlap);
-
+	
 	//setup mesh component & attach to root
 	FishMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh Component"));
 	FishMesh->SetupAttachment(RootComponent);
@@ -54,28 +55,19 @@ ABaseFish::ABaseFish()
 void ABaseFish::BeginPlay()
 {
 	Super::BeginPlay();
-
-	Velocity = this->GetActorForwardVector();
-
-	CurrentRotation = this->GetActorRotation();
 }
 
 FVector ABaseFish::Cohere(TArray<AActor*> School)
 {
 	FVector Steering = FVector::ZeroVector;
-	int32 SchoolCount = 0;
+	int32 SchoolCount = 0.0f;
 	FVector AveragePosition = FVector::ZeroVector;
 	
-	for (AActor* OtherFish : School)
+	for (AActor* OverlapActor : School)
 	{
-		ABaseFish* Schoolmate = Cast<ABaseFish>(OtherFish);
+		ABaseFish* Schoolmate = Cast<ABaseFish>(OverlapActor);
 		if (Schoolmate != nullptr && Schoolmate != this)
 		{
-			if (FVector::DotProduct(this->GetActorForwardVector(), (Schoolmate->GetActorLocation() - this->GetActorLocation()).GetSafeNormal()) < FOV)
-			{
-				continue;
-			}
-
 			AveragePosition += Schoolmate->GetActorLocation();
 			SchoolCount++;
 		}
@@ -85,7 +77,7 @@ FVector ABaseFish::Cohere(TArray<AActor*> School)
 	{
 		AveragePosition /= SchoolCount;
 		Steering = AveragePosition - this->GetActorLocation();
-		Steering = Steering.GetSafeNormal() - this->Velocity.GetSafeNormal();
+		Steering.GetSafeNormal() -= this->Velocity.GetSafeNormal();
 		Steering *= CoherenceStrength;
 		UE_LOG(LogTemp, Warning, TEXT("Cohere Steering: %s"), *Steering.ToString());
 		return Steering;
@@ -103,22 +95,16 @@ FVector ABaseFish::Separate(TArray<AActor*> School)
 	FVector SeparationDirection = FVector::ZeroVector;
 	float ProximityFactor = 0.0f;
 	
-	for (AActor* OtherFish : School)
+	for (AActor* OverlapActor : School)
 	{
-		ABaseFish* Schoolmate = Cast<ABaseFish>(OtherFish);
+		ABaseFish* Schoolmate = Cast<ABaseFish>(OverlapActor);
 		if (Schoolmate != nullptr && Schoolmate != this)
 		{
-			if (FVector::DotProduct(this->GetActorForwardVector(), (Schoolmate->GetActorLocation() - this->GetActorLocation()).GetSafeNormal()) < FOV)
-			{
-				continue;
-			}
-
 			//getting direction away from the nearest fish
 			SeparationDirection = this->GetActorLocation() - Schoolmate->GetActorLocation();
 			SeparationDirection = SeparationDirection.GetSafeNormal();
 			
-			float Distance = (Schoolmate->GetActorLocation() - this->GetActorLocation()).Size();
-			ProximityFactor = 1.0f - (Distance / this->PerceptionSensor->GetScaledSphereRadius());
+			ProximityFactor = 1.0f - (SeparationDirection.Size() / this->PerceptionSensor->GetScaledSphereRadius());
 
 			if (ProximityFactor <0.0f)
 			{
@@ -129,11 +115,12 @@ FVector ABaseFish::Separate(TArray<AActor*> School)
 			SchoolCount++;
 		}
 	}
+	UE_LOG(LogTemp, Warning, TEXT("SchoolCount: %d"), SchoolCount);
 
 	if (SchoolCount > 0)
 	{
 		Steering /= SchoolCount;
-		Steering = Steering.GetSafeNormal() - this->Velocity.GetSafeNormal();
+		Steering.GetSafeNormal() -= this->Velocity.GetSafeNormal();
 		Steering *= SeparationStrength;
 		UE_LOG(LogTemp, Warning, TEXT("Separate Steering: %s"), *Steering.ToString());
 		return Steering;
@@ -149,16 +136,11 @@ FVector ABaseFish::Align(TArray<AActor*> School)
 	FVector Steering = FVector::ZeroVector;
 	int32 SchoolCount = 0;
 	
-	for (AActor* OtherFish : School)
+	for (AActor* OverlapActor : School)
 	{
-		ABaseFish* Schoolmate = Cast<ABaseFish>(OtherFish);
+		ABaseFish* Schoolmate = Cast<ABaseFish>(OverlapActor);
 		if (Schoolmate != nullptr && Schoolmate != this)
 		{
-			if (FVector::DotProduct(this->GetActorForwardVector(), (Schoolmate->GetActorLocation() - this->GetActorLocation()).GetSafeNormal()) < FOV)
-			{
-				continue;
-			}
-
 			Steering += Schoolmate->Velocity.GetSafeNormal();
 			SchoolCount++;
 		}
@@ -167,7 +149,7 @@ FVector ABaseFish::Align(TArray<AActor*> School)
 	if (SchoolCount > 0)
 	{
 		Steering /= SchoolCount;
-		Steering = Steering.GetSafeNormal() - this->Velocity.GetSafeNormal();
+		Steering.GetSafeNormal() -= this->Velocity.GetSafeNormal();
 		Steering *= AlignmentStrength;
 		UE_LOG(LogTemp, Warning, TEXT("Align Steering: %s"), *Steering.ToString());
 		return Steering;
@@ -187,46 +169,39 @@ void ABaseFish::UpdateMeshRotation()
 void ABaseFish::Steer(float DeltaTime)
 {
 	FVector Acceleration = FVector::ZeroVector;
-
-	DrawDebugSphere(GetWorld(), GetActorLocation(), PerceptionSensor->GetScaledSphereRadius(), 12, FColor::Blue, false, -1.0f, 0, 1.5f);
 	
 	//Update position and rotation
 	this->SetActorLocation(this->GetActorLocation() + (Velocity * DeltaTime));
 	this->SetActorRotation(Velocity.ToOrientationQuat());
+	
+	// Apply steering forces
+	TArray<AActor*> Schoolmates;
+	PerceptionSensor->GetOverlappingActors(Schoolmates, TSubclassOf<ABaseFish>());
+	Acceleration += Separate(Schoolmates);
+	Acceleration += Align(Schoolmates);
+	Acceleration += Cohere(Schoolmates);
 
-	if (FlockingDelay > 0.0f)
-	{
-		FlockingDelay -= DeltaTime;
-	}
-	else
-	{
-		// Apply steering forces
-		TArray<AActor*> Schoolmates;
-		PerceptionSensor->GetOverlappingActors(Schoolmates, TSubclassOf<ABaseFish>());
-		Acceleration += Separate(Schoolmates);
-		Acceleration += Align(Schoolmates) * 0.5f; // Reduce initial alignment strength to encourage divergence
-		Acceleration += Cohere(Schoolmates);
-	}
-
-	if (IsObstacle())
+	/*if (IsObstacle())
 	{
 		Acceleration += AvoidObstacle();
-	}
+	}*/
 
-	for (int32 i = 0; i < TargetForces.Num(); ++i)
+	for (FVector TargetForce : TargetForces)
 	{
-		Acceleration += TargetForces[i];
+		Acceleration += TargetForce;
+		TargetForces.Remove(TargetForce);
 	}
-	TargetForces.Empty();
 
-	float MaxAcceleration = 1000.0f;
-	Acceleration = Acceleration.GetClampedToMaxSize(MaxAcceleration);
+	// Draw debug lines to visualize the steering forces
+	//DrawDebugLine(GetWorld(), GetActorLocation(), GetActorLocation() + (Separate(Schoolmates) * 100), FColor::Red, false, -1.0f, 0, 1.5f);
+	//DrawDebugLine(GetWorld(), GetActorLocation(), GetActorLocation() + (Align(Schoolmates) * 100), FColor::Green, false, -1.0f, 0, 1.5f);
+	//DrawDebugLine(GetWorld(), GetActorLocation(), GetActorLocation() + (Cohere(Schoolmates) * 100), FColor::Blue, false, -1.0f, 0, 1.5f);
 
 	Velocity += (Acceleration * DeltaTime);
 	Velocity = Velocity.GetClampedToSize(MinSpeed, MaxSpeed);
 
-	UE_LOG(LogTemp, Warning, TEXT("Acceleration: %s"), *Acceleration.ToString());
-	UE_LOG(LogTemp, Warning, TEXT("Velocity: %s"), *Velocity.ToString());
+	//UE_LOG(LogTemp, Warning, TEXT("Acceleration: %s"), *Acceleration.ToString());
+	//UE_LOG(LogTemp, Warning, TEXT("Velocity: %s"), *Velocity.ToString());
 	
 }
 
