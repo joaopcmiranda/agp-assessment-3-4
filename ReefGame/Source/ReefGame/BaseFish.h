@@ -12,9 +12,18 @@ class UStaticMeshComponent;
 class USphereComponent;
 
 UENUM(BlueprintType)
+enum class EFishType : uint8
+{
+	BaseFish UMETA(DisplayName = "Base Fish"),
+	FishTypeA UMETA(DisplayName = "Type A"),
+	FIshTypeB UMETA(DisplayName = "Type B"),
+	Shark UMETA(DisplayName = "Shark")
+};
+
+UENUM(BlueprintType)
 enum class EFishState : uint8
 {
-	Swim,
+	Roam,
 	Evade
 };
 
@@ -28,8 +37,12 @@ public:
 	ABaseFish();
 
 protected:
+
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+
+//State
+	EFishState CurrentState = EFishState::Roam;
 	
 //Components
 	UPROPERTY(VisibleAnywhere)
@@ -44,21 +57,26 @@ protected:
 	UPROPERTY(VisibleAnywhere)
 	UHealthComponent* HealthComponent;
 
-//Current state	
-	UPROPERTY(EditAnywhere)
-	EFishState CurrentState = EFishState::Swim;
-
-//School controller	
+//Fish in radius
 	UPROPERTY()
-	AFishSchoolController* FishSchoolController;
+	TArray<AActor*> FishInRadius;
+
+	UPROPERTY()
+	TArray<AActor*> FishOfSameType;
+
+	UPROPERTY()
+	ABaseFish* Predator = nullptr;
+	
+	void UpdateFishInRadius();
+	void UpdateFishTypes();
 
 //Movement
 
 	FVector Velocity;
 	FRotator CurrentRotation;
 	
-	float MaxSpeed = 1000.0f;
-	float MinSpeed = 500.0f;
+	float MaxSpeed = 3000.0f;
+	float MinSpeed = 2000.0f;
 
 //MovementFunctions	
 
@@ -68,7 +86,11 @@ protected:
 	FVector Separate(TArray<AActor*> School);
 	FVector Align(TArray<AActor*> School);
 
-	void Steer(float DeltaTime);
+	virtual void AvoidPredator(float DeltaTime);
+
+	virtual void Steer(float DeltaTime);
+
+	void CapMovementArea();
 	
 //Obstacle Avoidance
 
@@ -83,9 +105,9 @@ protected:
 
 
 //Weighting
-	float CoherenceStrength = 1.0f;
-	float SeparationStrength = 1.5f;
-	float AlignmentStrength = 1.0f;
+	float CoherenceStrength = 1.5f;
+	float SeparationStrength = 1.6f;
+	float AlignmentStrength = 1.5f;
 
 
 public:	
@@ -93,5 +115,7 @@ public:
 	virtual void Tick(float DeltaTime) override;
 	
 	void AddTargetForce(FVector TargetForce);
+
+	virtual EFishType GetFishType() const;
 	
 };

@@ -5,7 +5,7 @@
 #include "HealthComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
-#include "EngineUtils.h"
+#include "Kismet/KismetMathLibrary.h"
 
 // Sets default values
 ABaseFish::ABaseFish()
@@ -33,7 +33,7 @@ ABaseFish::ABaseFish()
 	PerceptionSensor->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	PerceptionSensor->SetCollisionResponseToAllChannels(ECR_Ignore);
 	PerceptionSensor->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
-	PerceptionSensor->SetSphereRadius(500.0f);
+	PerceptionSensor->SetSphereRadius(2000.0f);
 
 	//Set random initial velocity with random direction and speed.
 	float InitialSpeed = FMath::RandRange(MinSpeed, MaxSpeed);
@@ -65,9 +65,9 @@ FVector ABaseFish::Cohere(TArray<AActor*> School)
 	
 	for (AActor* OverlapActor : School)
 	{
-		ABaseFish* Schoolmate = Cast<ABaseFish>(OverlapActor);
-		if (Schoolmate != nullptr && Schoolmate != this)
+		if (OverlapActor)
 		{
+			ABaseFish* Schoolmate = Cast<ABaseFish>(OverlapActor);
 			AveragePosition += Schoolmate->GetActorLocation();
 			SchoolCount++;
 		}
@@ -88,22 +88,28 @@ FVector ABaseFish::Cohere(TArray<AActor*> School)
 	}
 }
 
-FVector ABaseFish::Separate(TArray<AActor*> School)
+FVector ABaseFish::Separate(TArray<AActor*> AllFish)
 {
 	FVector Steering = FVector::ZeroVector;
 	int32 SchoolCount = 0;
 	FVector SeparationDirection = FVector::ZeroVector;
 	float ProximityFactor = 0.0f;
 	
-	for (AActor* OverlapActor : School)
+	for (AActor* OverlapActor : AllFish)
 	{
-		ABaseFish* Schoolmate = Cast<ABaseFish>(OverlapActor);
-		if (Schoolmate != nullptr && Schoolmate != this)
+		if (OverlapActor)
 		{
-			//getting direction away from the nearest fish
-			SeparationDirection = this->GetActorLocation() - Schoolmate->GetActorLocation();
+			ABaseFish* OtherFish = Cast<ABaseFish>(OverlapActor);
+
+			if (!OtherFish)
+			{
+				continue;
+			}
+
+
+			SeparationDirection = this->GetActorLocation() - OtherFish->GetActorLocation();
 			SeparationDirection = SeparationDirection.GetSafeNormal();
-			
+		
 			ProximityFactor = 1.0f - (SeparationDirection.Size() / this->PerceptionSensor->GetScaledSphereRadius());
 
 			if (ProximityFactor <0.0f)
@@ -115,7 +121,6 @@ FVector ABaseFish::Separate(TArray<AActor*> School)
 			SchoolCount++;
 		}
 	}
-	UE_LOG(LogTemp, Warning, TEXT("SchoolCount: %d"), SchoolCount);
 
 	if (SchoolCount > 0)
 	{
@@ -138,9 +143,9 @@ FVector ABaseFish::Align(TArray<AActor*> School)
 	
 	for (AActor* OverlapActor : School)
 	{
-		ABaseFish* Schoolmate = Cast<ABaseFish>(OverlapActor);
-		if (Schoolmate != nullptr && Schoolmate != this)
+		if (OverlapActor)
 		{
+			ABaseFish* Schoolmate = Cast<ABaseFish>(OverlapActor);
 			Steering += Schoolmate->Velocity.GetSafeNormal();
 			SchoolCount++;
 		}
@@ -160,6 +165,42 @@ FVector ABaseFish::Align(TArray<AActor*> School)
 	}
 }
 
+void ABaseFish::UpdateFishInRadius()
+{
+	if (PerceptionSensor)
+	{
+		FishInRadius.Empty();
+		PerceptionSensor->GetOverlappingActors(FishInRadius, ABaseFish::StaticClass());
+	}
+}
+
+void ABaseFish::UpdateFishTypes()
+{
+	Predator = nullptr;
+	FishOfSameType.Empty();
+	
+	for (AActor* OverlapActor : FishInRadius)
+	{
+		ABaseFish* Fish = Cast<ABaseFish>(OverlapActor);
+		
+		if (!IsValid(Fish) || Fish == this)
+		{
+			continue;
+		}
+		
+		//Check for and update predator
+		if (Fish->GetFishType() == EFishType::Shark)
+		{
+			Predator = Fish;
+		}
+		// Otherwise, add fish of the same type
+		else if (Fish->GetFishType() == this->GetFishType())
+		{
+			FishOfSameType.Add(Fish);
+		}
+	}
+}
+
 void ABaseFish::UpdateMeshRotation()
 {
 	CurrentRotation = FMath::RInterpTo(CurrentRotation, this->GetActorRotation(), GetWorld()->DeltaTimeSeconds, 7.0f);
@@ -169,17 +210,15 @@ void ABaseFish::UpdateMeshRotation()
 void ABaseFish::Steer(float DeltaTime)
 {
 	FVector Acceleration = FVector::ZeroVector;
-	
-	//Update position and rotation
+
+	// Update position and rotation
 	this->SetActorLocation(this->GetActorLocation() + (Velocity * DeltaTime));
 	this->SetActorRotation(Velocity.ToOrientationQuat());
-	
+
 	// Apply steering forces
-	TArray<AActor*> Schoolmates;
-	PerceptionSensor->GetOverlappingActors(Schoolmates, TSubclassOf<ABaseFish>());
-	Acceleration += Separate(Schoolmates);
-	Acceleration += Align(Schoolmates);
-	Acceleration += Cohere(Schoolmates);
+	Acceleration += Separate(FishInRadius);
+	Acceleration += Align(FishOfSameType);
+	Acceleration += Cohere(FishOfSameType);
 
 	if (IsObstacle())
 	{
@@ -192,25 +231,103 @@ void ABaseFish::Steer(float DeltaTime)
 		TargetForces.Remove(TargetForce);
 	}
 
-	// Draw debug lines to visualize the steering forces
-	//DrawDebugLine(GetWorld(), GetActorLocation(), GetActorLocation() + (Separate(Schoolmates) * 100), FColor::Red, false, -1.0f, 0, 1.5f);
-	//DrawDebugLine(GetWorld(), GetActorLocation(), GetActorLocation() + (Align(Schoolmates) * 100), FColor::Green, false, -1.0f, 0, 1.5f);
-	//DrawDebugLine(GetWorld(), GetActorLocation(), GetActorLocation() + (Cohere(Schoolmates) * 100), FColor::Blue, false, -1.0f, 0, 1.5f);
-
 	Velocity += (Acceleration * DeltaTime);
 	Velocity = Velocity.GetClampedToSize(MinSpeed, MaxSpeed);
 
-	//UE_LOG(LogTemp, Warning, TEXT("Acceleration: %s"), *Acceleration.ToString());
-	//UE_LOG(LogTemp, Warning, TEXT("Velocity: %s"), *Velocity.ToString());
-	
+	// Smoothly cap movement in the Z-axis between -5000 and 5000
+	CapMovementArea();
 }
+
+void ABaseFish::CapMovementArea()
+{
+	FVector CurrentLocation = this->GetActorLocation();
+
+	//x
+	if (CurrentLocation.X > 5000.0f)
+	{
+		Velocity.X = FMath::Clamp(Velocity.X, -MaxSpeed, 0.0f);
+	}
+	else if (CurrentLocation.X < -5000.0f)
+	{
+		Velocity.X = FMath::Clamp(Velocity.X, 0.0f, MaxSpeed);
+	}
+
+	//y
+	if (CurrentLocation.Y > 5000.0f)
+	{
+		Velocity.Y = FMath::Clamp(Velocity.Y, -MaxSpeed, 0.0f);
+	}
+	else if (CurrentLocation.Y < -5000.0f)
+	{
+		Velocity.Y = FMath::Clamp(Velocity.Y, 0.0f, MaxSpeed);
+	}
+
+	//z
+	if (CurrentLocation.Z > 5000.0f)
+	{
+		Velocity.Z = FMath::Clamp(Velocity.Z, -MaxSpeed, 0.0f);
+	}
+	else if (CurrentLocation.Z < -5000.0f)
+	{
+		Velocity.Z = FMath::Clamp(Velocity.Z, 0.0f, MaxSpeed);
+	}
+}
+
+void ABaseFish::AvoidPredator(float DeltaTime)
+{
+	FVector Steering = FVector::ZeroVector;
+	FVector Acceleration = FVector::ZeroVector;
+
+	if (Predator)
+	{
+		FVector DirectionAwayFromPredator = (this->GetActorLocation() - Predator->GetActorLocation()).GetSafeNormal();
+		Acceleration += DirectionAwayFromPredator * 1500.0f;
+		
+		FVector SeparationForce = FVector::ZeroVector;
+		int32 NeighborCount = 0;
+
+		for (AActor* Neighbor : FishInRadius)
+		{
+			ABaseFish* NeighborFish = Cast<ABaseFish>(Neighbor);
+			if (NeighborFish && NeighborFish != this)
+			{
+				FVector DirectionAwayFromNeighbor = (this->GetActorLocation() - NeighborFish->GetActorLocation()).GetSafeNormal();
+				float Distance = FVector::Dist(this->GetActorLocation(), NeighborFish->GetActorLocation());
+				SeparationForce += DirectionAwayFromNeighbor / Distance;
+				NeighborCount++;
+			}
+		}
+
+		if (NeighborCount > 0)
+		{
+			SeparationForce /= NeighborCount;
+			SeparationForce *= 1000.0f;
+			Acceleration += SeparationForce;
+		}
+
+		Velocity += Acceleration * DeltaTime;
+		Velocity = Velocity.GetClampedToSize(MinSpeed, MaxSpeed);
+	}
+
+	// Update the fish's location
+	this->SetActorLocation(this->GetActorLocation() + (Velocity * DeltaTime));
+
+	if (Predator)
+	{
+		FRotator AvoidRotation = UKismetMathLibrary::FindLookAtRotation(this->GetActorLocation(), this->GetActorLocation() + Velocity);
+		SetActorRotation(FMath::RInterpTo(GetActorRotation(), AvoidRotation, DeltaTime, 5.0f));
+	}
+
+	CapMovementArea();
+}
+
 
 bool ABaseFish::IsObstacle()
 {
 	// Mixed obstacle detection using multiple line traces in different directions.
 	FHitResult Hit;
 	FVector StartLocation = GetActorLocation();
-	float TraceDistance = 500.0f; // Trace distance of 500 units
+	float TraceDistance = 1000.0f;
 	FCollisionQueryParams TraceParams(FName(TEXT("ObstacleTrace")), true, this);
 
 	TArray<FVector> Directions = {
@@ -224,7 +341,12 @@ bool ABaseFish::IsObstacle()
 		FVector EndLocation = StartLocation + (Direction * TraceDistance);
 		if (GetWorld()->LineTraceSingleByChannel(Hit, StartLocation, EndLocation, ECC_Visibility, TraceParams))
 		{
-			// Check if the fish is already inside the detected object
+			if (Hit.GetActor() == nullptr)
+			{
+				UE_LOG(LogTemp, Error, TEXT("Hit.GetActor() is nullptr in IsObstacle()."));
+				continue;
+			}
+			
 			TArray<AActor*> OverlappingActors;
 			GetOverlappingActors(OverlappingActors);
 			for (AActor* OverlappingActor : OverlappingActors)
@@ -262,7 +384,25 @@ void ABaseFish::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	Steer(DeltaTime);
+	UpdateFishInRadius();
+	UpdateFishTypes();
+
+	if (CurrentState == EFishState::Roam)
+	{
+		Steer(DeltaTime);
+		if (Predator != nullptr)
+		{
+			CurrentState = EFishState::Evade;
+		}
+	}
+	else if (CurrentState == EFishState::Evade)
+	{
+		AvoidPredator(DeltaTime);
+		if (Predator == nullptr)
+		{
+			CurrentState = EFishState::Roam;
+		}
+	}
 
 	UpdateMeshRotation();
 }
@@ -270,6 +410,11 @@ void ABaseFish::Tick(float DeltaTime)
 void ABaseFish::AddTargetForce(FVector TargetForce)
 {
 	TargetForces.Add(TargetForce);
+}
+
+EFishType ABaseFish::GetFishType() const
+{
+	return EFishType::BaseFish;
 }
 
 	
