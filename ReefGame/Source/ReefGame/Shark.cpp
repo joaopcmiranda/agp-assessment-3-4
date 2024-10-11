@@ -7,71 +7,51 @@
 
 AShark::AShark()
 {
-	MaxSpeed = 2500.0f;
-    PerceptionSensor->SetSphereRadius(5000.0f);
+	PerceptionSensor->SetSphereRadius(10000.0f);
 }
 
 void AShark::BeginPlay()
 {
 	Super::BeginPlay();
-}
+	
+	MaxSpeed = 4000.0f;
+	MinSpeed = 3500.0f;
+	PreyType = EFishType::BaseFish;
+	FishType = EFishType::Shark;
+	PredatorType = EFishType::FishTypeB;
 
-EFishType AShark::GetFishType() const
-{
-	return EFishType::Shark;
+	UE_LOG(LogTemp, Log, TEXT("Shark Constructor: FishType = %s, PreyType = %s"), 
+		*UEnum::GetValueAsString(FishType), 
+		*UEnum::GetValueAsString(PreyType));
 }
 
 void AShark::Steer(float DeltaTime)
 {
-    FVector Acceleration = FVector::ZeroVector;
+	FVector Acceleration = FVector::ZeroVector;
 
-    if (LockedPrey == nullptr || !LockedPrey->IsValidLowLevel() || IsValid(LockedPrey))
-    {
-        float MinDistance = TNumericLimits<float>::Max();
+	// Update position and rotation
+	this->SetActorLocation(this->GetActorLocation() + (Velocity * DeltaTime));
+	this->SetActorRotation(Velocity.ToOrientationQuat());
 
-        for (AActor* DetectedActor : FishInRadius)
-        {
-            ABaseFish* PotentialPrey = Cast<ABaseFish>(DetectedActor);
-            if (PotentialPrey != nullptr && PotentialPrey != this && PotentialPrey->GetFishType() == PreyType)
-            {
-                float Distance = FVector::Dist(this->GetActorLocation(), PotentialPrey->GetActorLocation());
-                if (Distance < MinDistance)
-                {
-                    MinDistance = Distance;
-                    LockedPrey = PotentialPrey;
-                }
-            }
-        }
-    }
-    
-    if (LockedPrey)
-    {
-        FVector DirectionToPrey = (LockedPrey->GetActorLocation() - this->GetActorLocation()).GetSafeNormal();
-        Acceleration = DirectionToPrey * 1500.0f;
-        Velocity += Acceleration * DeltaTime;
-        Velocity = Velocity.GetClampedToSize(MinSpeed, MaxSpeed);
-    }
-    
-    this->SetActorLocation(this->GetActorLocation() + (Velocity * DeltaTime));
+	// Apply steering forces
+	Acceleration += Separate(FishInRadius);
+	Acceleration += Align(FishInRadius);
+	Acceleration += Cohere(FishInRadius);
 
-    if (LockedPrey)
-    {
-        FRotator LookAtRotation = UKismetMathLibrary::FindLookAtRotation(this->GetActorLocation(), LockedPrey->GetActorLocation());
-        SetActorRotation(FMath::RInterpTo(GetActorRotation(), LookAtRotation, DeltaTime, 5.0f));
-    }
-    else
-    {
-        this->SetActorRotation(Velocity.ToOrientationQuat());
-    }
+	if (IsObstacle())
+	{
+		Acceleration += AvoidObstacle();
+	}
 
-    FVector CurrentLocation = this->GetActorLocation();
-    if (CurrentLocation.Z > 5000.0f)
-    {
-        Velocity.Z = FMath::Clamp(Velocity.Z, -MaxSpeed, 0.0f);
-    }
-    else if (CurrentLocation.Z < -5000.0f)
-    {
-        Velocity.Z = FMath::Clamp(Velocity.Z, 0.0f, MaxSpeed);
-    }
+	for (FVector TargetForce : TargetForces)
+	{
+		Acceleration += TargetForce;
+		TargetForces.Remove(TargetForce);
+	}
+
+	Velocity += (Acceleration * DeltaTime);
+	Velocity = Velocity.GetClampedToSize(MinSpeed, MaxSpeed);
+
+	// Smoothly cap movement in the Z-axis between -5000 and 5000
+	CapMovementArea();
 }
-

@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "NiagaraSystem.h"
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "BaseFish.generated.h"
@@ -16,15 +17,16 @@ enum class EFishType : uint8
 {
 	BaseFish UMETA(DisplayName = "Base Fish"),
 	FishTypeA UMETA(DisplayName = "Type A"),
-	FIshTypeB UMETA(DisplayName = "Type B"),
+	FishTypeB UMETA(DisplayName = "Type B"),
 	Shark UMETA(DisplayName = "Shark")
 };
 
 UENUM(BlueprintType)
 enum class EFishState : uint8
 {
-	Roam,
-	Evade
+	Roam UMETA(DisplayName = "Roam"),
+	Evade UMETA(DisplayName = "Evade"),
+	Hunt UMETA(DisplayName = "Hunt")
 };
 
 UCLASS()
@@ -43,13 +45,15 @@ protected:
 
 //State
 	EFishState CurrentState = EFishState::Roam;
+
+	EFishType FishType = EFishType::BaseFish;
 	
 //Components
 	UPROPERTY(VisibleAnywhere)
 	USphereComponent* FishCollision;
 
 	UPROPERTY(VisibleAnywhere)
-	UStaticMeshComponent* FishMesh;
+	USkeletalMeshComponent* FishMesh;
 
 	UPROPERTY(VisibleAnywhere)
 	USphereComponent* PerceptionSensor;
@@ -66,6 +70,15 @@ protected:
 
 	UPROPERTY()
 	ABaseFish* Predator = nullptr;
+
+	UPROPERTY()
+	ABaseFish* Prey = nullptr;
+
+	UPROPERTY()
+	EFishType PredatorType = EFishType::Shark;
+
+	UPROPERTY()
+	EFishType PreyType = EFishType::FishTypeB;
 	
 	void UpdateFishInRadius();
 	void UpdateFishTypes();
@@ -90,6 +103,8 @@ protected:
 
 	virtual void Steer(float DeltaTime);
 
+	virtual void Hunt(float DeltaTime);
+
 	void CapMovementArea();
 	
 //Obstacle Avoidance
@@ -101,14 +116,15 @@ protected:
 
 //Perception
 	float FOV = FMath::Cos(FMath::DegreesToRadians(120.0f));
-	float FlockingDelay = 0.0f;
-
-
+	
 //Weighting
-	float CoherenceStrength = 1.5f;
+	float CoherenceStrength = 1.9f;
 	float SeparationStrength = 1.6f;
 	float AlignmentStrength = 1.5f;
 
+//Death effect
+	UPROPERTY(EditDefaultsOnly)
+	UNiagaraSystem* DeathEffect;
 
 public:	
 
@@ -117,5 +133,9 @@ public:
 	void AddTargetForce(FVector TargetForce);
 
 	virtual EFishType GetFishType() const;
-	
+
+	UFUNCTION(BlueprintCallable)
+	float GetMinSpeed();
+
+	virtual void OnDeath();
 };

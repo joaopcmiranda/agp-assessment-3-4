@@ -15,19 +15,12 @@ class REEFGAME_API AShark : public ABaseFish
 	GENERATED_BODY()
 
 public:
-
 	AShark();
-	virtual EFishType GetFishType() const override;
 
 protected:
-
-	virtual void Steer(float DeltaTime) override;
+	
 	virtual void BeginPlay() override;
 
-	EFishType PreyType = EFishType::BaseFish;
-
-private:
-	UPROPERTY()
-	ABaseFish* LockedPrey = nullptr;
+	virtual void Steer(float DeltaTime) override;
 	
 };
