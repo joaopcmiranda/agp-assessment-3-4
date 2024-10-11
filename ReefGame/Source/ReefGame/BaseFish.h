@@ -8,7 +8,6 @@
 #include "BaseFish.generated.h"
 
 class UHealthComponent;
-class AFishSchoolController;
 class UStaticMeshComponent;
 class USphereComponent;
 
