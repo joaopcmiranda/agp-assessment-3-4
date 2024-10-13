@@ -38,14 +38,22 @@ UCLASS()
 class REEFGAME_API ATerrain : public AActor {
 	GENERATED_BODY()
 
-
 public:
 	// Sets default values for this actor's properties
 	ATerrain();
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 	void         Regenerate(FScopedSlowTask& Progress);
-	void    ClearLandScape(FScopedSlowTask& Progress);
+	void         ClearLandScape(FScopedSlowTask& Progress);
+	float        CalculateDistanceToCentre(int32 X, int32 Y) const;
+	float        CalculateHeight(int32 X, int32 Y) const;
+	FVector      CalculateDisplacement(int32 X, int32 Y) const;
+	FVector      CalculateNormal(int32 X, int32 Y) const;
+	float        CalculateDepth(int32 X, int32 Y) const;
+	FVector      GetVertexPosition(int32 X, int32 Y) const;
+
+	float MaxHeight = TNumericLimits<float>::Lowest();
+	float MinHeight = TNumericLimits<float>::Max();
 
 protected:
 	// Called when the game starts or when spawned
@@ -57,9 +65,6 @@ protected:
 	UPROPERTY()
 	UCurveVector* CliffCurve;
 
-	float   CalculateDistanceToCentre(float X, float Y) const;
-	float   CalculateHeight(float X, float Y) const;
-	FVector CalculateDisplacement(float X, float Y) const;
 
 	UPROPERTY()
 	TArray<FVector> Vertices;

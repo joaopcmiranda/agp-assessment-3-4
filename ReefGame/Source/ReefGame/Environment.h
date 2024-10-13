@@ -7,33 +7,45 @@
 #include "GameFramework/Actor.h"
 #include "Environment.generated.h"
 
+class AFixedBeing;
+
 UCLASS()
 class REEFGAME_API AEnvironment : public AActor {
 	GENERATED_BODY()
 
 	FTerrainParameters CachedTerrainParameters;
 
-	void RegenerateEnvironmentInternal() const;
+	void RegenerateEnvironmentInternal();
 	bool SetTerrainParams();
-
 public:
 	// Sets default values for this actor's properties
 	AEnvironment();
-	void OnConstruction(const FTransform& Transform);
 
+	#if WITH_EDITOR
+
+	void OnConstruction(const FTransform& Transform);
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Terrain")
-	void RegenerateEnvironment();
+	void Regenerate();
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Terrain")
-	void ForceRegenerateEnvironment();
+	void ForceRegenerate();
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Terrain")
+	void ClearFixedBeings();
+
+	void PlaceFixedBeings(FScopedSlowTask& Progress);
+	void ReplenishPicker(TArray<TArray<AFixedBeing*>>& Picker);
+	void PlaceFixedBeingsPass(TArray<TArray<AFixedBeing*>>& Picker, const int32& Pass, FScopedSlowTask& Progress);
+
+	#endif
+
+	void InitializeTerrain();
+
 	virtual void PostLoad() override;
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
-
 
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
-	void InitializeTerrain();
 	void LogTerrainStatus();
 
 
@@ -81,10 +93,13 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Terrain")
 	UCurveVector* CliffCurve;
 
+	UPROPERTY(EditAnywhere, Category="Terrain Fauna/Flora")
+	float FixedBeingPlacingPrecision = 0.1f;
+	UPROPERTY(EditAnywhere, Category="Terrain Fauna/Flora")
+	int32 FixedBeingPlacingPasses = 5;
 
-
-	UPROPERTY()
-	TArray<class AFlora*> Flora;
+	UPROPERTY(EditAnywhere, Category="Terrain Fauna/Flora")
+	TArray<TSubclassOf<AFixedBeing>> FixedBeingsClasses;
 
 	UPROPERTY()
 	ATerrain* Terrain;

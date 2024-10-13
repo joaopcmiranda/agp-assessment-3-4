@@ -3,7 +3,6 @@
 
 #include "Terrain.h"
 
-#include "Kismet/KismetSystemLibrary.h"
 #include "KismetProceduralMeshLibrary.h"
 #include "Misc/ScopedSlowTask.h"
 
@@ -53,7 +52,7 @@ void ATerrain::ClearLandScape(FScopedSlowTask& Progress)
 	ProceduralMesh->ClearAllMeshSections();
 }
 
-float ATerrain::CalculateDistanceToCentre(const float X, const float Y) const
+float ATerrain::CalculateDistanceToCentre(const int32 X, const int32 Y) const
 {
 	const float CentreX = TerrainParameters.Width / 2;
 	const float CentreY = TerrainParameters.Height / 2;
@@ -77,7 +76,7 @@ float ATerrain::CalculateDistanceToCentre(const float X, const float Y) const
 	return (DistToCentre / MaxDistToCentre) * XCurve;
 }
 
-float ATerrain::CalculateHeight(const float X, const float Y) const
+float ATerrain::CalculateHeight(const int32 X, const int32 Y) const
 {
 	const float SandNoise = FMath::PerlinNoise2D(FVector2d(X * TerrainParameters.SandRoughness, Y * TerrainParameters.SandRoughness)) * TerrainParameters
 	.SandBankHeight;
@@ -90,10 +89,12 @@ float ATerrain::CalculateHeight(const float X, const float Y) const
 	const float SandbankHeight = SandNoise * (1 - ZCurve);
 	const float CliffHeight = ZCurve * TerrainParameters.CliffIntensity;
 
-	return SandbankHeight + CliffHeight + Modifier;
+	auto const Height = SandbankHeight + CliffHeight + Modifier;
+
+	return Height;
 }
 
-FVector ATerrain::CalculateDisplacement(const float X, const float Y) const
+FVector ATerrain::CalculateDisplacement(const int32 X, const int32 Y) const
 {
 	const float Distance = CalculateDistanceToCentre(X, Y);
 
@@ -110,6 +111,30 @@ FVector ATerrain::CalculateDisplacement(const float X, const float Y) const
 	// height is Z, encroachment is XY
 	return FVector(Encroachment.X, Encroachment.Y, CalculateHeight(X, Y));
 
+}
+
+FVector ATerrain::CalculateNormal(int32 const X, int32 const Y) const
+{
+	return Normals[X + Y * (TerrainParameters.Height * TerrainParameters.Density)];
+}
+
+float ATerrain::CalculateDepth(int32 const X, int32 const Y) const
+{
+	const float HeightRange = MaxHeight - MinHeight;
+
+	const float VertexHeight = Vertices[X + Y * (TerrainParameters.Height * TerrainParameters.Density)].Z;
+
+	if(HeightRange > SMALL_NUMBER)
+	{
+		return 1.f - ((VertexHeight - MinHeight) / HeightRange);
+	}
+
+	return 0.f;
+}
+
+FVector ATerrain::GetVertexPosition(const int32 X, const int32 Y) const
+{
+	return Vertices[X + Y * (TerrainParameters.Height * TerrainParameters.Density)];
 }
 
 void ATerrain::Regenerate(FScopedSlowTask& Progress)
@@ -137,11 +162,21 @@ void ATerrain::Regenerate(FScopedSlowTask& Progress)
 			const FVector2d Position = FVector2D(x / TerrainParameters.Density, y / TerrainParameters.Density);
 			FVector         Vec = FVector(Position.X, Position.Y, 0) + CalculateDisplacement(Position.X, Position.Y);
 
+			if(Vec.Z < MinHeight)
+			{
+				MinHeight = Vec.Z;
+			}
+			if(Vec.Z > MaxHeight)
+			{
+				MaxHeight = Vec.Z;
+			}
+
+
 			Vertices.Add(Vec);
 
 			UVCoords.Add(FVector2D(x, y));
 		}
-		FPlatformProcess::Sleep(.5f/NumOfYVertices);
+		FPlatformProcess::Sleep(.5f / NumOfYVertices);
 	}
 
 	for(int32 y = 0; y < NumOfYVertices - 1; y++)
@@ -161,7 +196,7 @@ void ATerrain::Regenerate(FScopedSlowTask& Progress)
 			Triangles.Add(x + (y + 1) * NumOfXVertices);
 			Triangles.Add(x + 1 + (y + 1) * NumOfXVertices);
 		}
-		FPlatformProcess::Sleep(.5f/NumOfYVertices);
+		FPlatformProcess::Sleep(.5f / NumOfYVertices);
 	}
 
 	if(ProceduralMesh)
