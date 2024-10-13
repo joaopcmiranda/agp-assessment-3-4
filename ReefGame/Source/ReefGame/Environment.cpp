@@ -10,7 +10,7 @@ void AEnvironment::RegenerateEnvironment()
 {
 	UE_LOG(LogTemp, Log, TEXT("Regenerating Environment..."));
 	LogTerrainStatus();
-	if (!Terrain)
+	if(!Terrain)
 	{
 		InitializeTerrain();
 	}
@@ -27,7 +27,7 @@ void AEnvironment::RegenerateEnvironment()
 
 void AEnvironment::ForceRegenerateEnvironment()
 {
-	if (!Terrain)
+	if(!Terrain)
 	{
 		InitializeTerrain();
 	}
@@ -44,24 +44,21 @@ void AEnvironment::RegenerateEnvironmentInternal() const
 	const float NumOfXVertices = Width * Density;
 	const float NumOfYVertices = Height * Density;
 
+
 	const float NumberOfTasks =
-	1 // Clear Triangles
-	+ 1 // Clear Vertices
-	+ 1 // Clear UVs
-	+ 1 // Clear Mesh
+	+4 // Clearing the landscape
 	+ NumOfXVertices * NumOfYVertices // Vertex/UV generation
 	+ (NumOfXVertices - 1) * (NumOfYVertices - 1) // Triangle generation
 	+ 1 // Normals generation
 	+ 1 // Procedural mesh generation
 	+ 1 // Set Material
 	;
-
-	FScopedSlowTask SlowTask(NumberOfTasks, FText::FromString("Regenerating Environment"));
-	SlowTask.MakeDialog();
+	FScopedSlowTask Progress(NumberOfTasks, FText::FromString("Regenerating Environment"));
+	Progress.MakeDialog(true, true);
 
 	// Terrain Generation
-	Terrain->ClearLandScape(SlowTask);
-	Terrain->Regenerate(SlowTask);
+	Terrain->ClearLandScape(Progress);
+	Terrain->Regenerate(Progress);
 }
 
 bool AEnvironment::SetTerrainParams()
@@ -170,26 +167,26 @@ void AEnvironment::InitializeTerrain()
 	UE_LOG(LogTemp, Log, TEXT("Initializing Terrain..."));
 	LogTerrainStatus();
 
-	if (!TerrainComponent)
+	if(!TerrainComponent)
 	{
 		UE_LOG(LogTemp, Error, TEXT("TerrainComponent is null in AEnvironment"));
 		return;
 	}
 
-	if (!TerrainComponent->GetChildActorClass())
+	if(!TerrainComponent->GetChildActorClass())
 	{
 		UE_LOG(LogTemp, Error, TEXT("TerrainComponent's ChildActorClass is not set"));
 		return;
 	}
 
-	if (!TerrainComponent->GetChildActor())
+	if(!TerrainComponent->GetChildActor())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("TerrainComponent's ChildActor is null, attempting to spawn..."));
 		TerrainComponent->CreateChildActor();
 	}
 
 	Terrain = Cast<ATerrain>(TerrainComponent->GetChildActor());
-	if (Terrain)
+	if(Terrain)
 	{
 		UE_LOG(LogTemp, Log, TEXT("Terrain initialized successfully"));
 		Terrain->SetMaterial(TerrainMaterial);
@@ -208,12 +205,12 @@ void AEnvironment::InitializeTerrain()
 void AEnvironment::LogTerrainStatus()
 {
 	UE_LOG(LogTemp, Log, TEXT("TerrainComponent valid: %s"), TerrainComponent ? TEXT("True") : TEXT("False"));
-	if (TerrainComponent)
+	if(TerrainComponent)
 	{
 		UE_LOG(LogTemp, Log, TEXT("TerrainComponent's ChildActor class: %s"),
-			   *GetNameSafe(TerrainComponent->GetChildActorClass()));
+		       *GetNameSafe(TerrainComponent->GetChildActorClass()));
 		UE_LOG(LogTemp, Log, TEXT("TerrainComponent's ChildActor: %s"),
-			   *GetNameSafe(TerrainComponent->GetChildActor()));
+		       *GetNameSafe(TerrainComponent->GetChildActor()));
 	}
 	UE_LOG(LogTemp, Log, TEXT("Terrain pointer valid: %s"), Terrain ? TEXT("True") : TEXT("False"));
 }

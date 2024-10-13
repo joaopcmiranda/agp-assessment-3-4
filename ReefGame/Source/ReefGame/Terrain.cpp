@@ -45,13 +45,11 @@ void ATerrain::BeginPlay()
 void ATerrain::ClearLandScape(FScopedSlowTask& Progress)
 {
 	UE_LOG(LogTemp, Warning, TEXT("ATerrain::ClearLandScape"));
-	Progress.EnterProgressFrame(1.f, FText::FromString("Clearing Triangles"));
+
+	Progress.EnterProgressFrame(4.f, FText::FromString(FString::Printf(TEXT("Clearing Landscape..."))));
 	Triangles.Empty();
-	Progress.EnterProgressFrame(1.f, FText::FromString("Clearing Vertices"));
 	Vertices.Empty();
-	Progress.EnterProgressFrame(1.f, FText::FromString("Clearing UVs"));
 	UVCoords.Empty();
-	Progress.EnterProgressFrame(1.f, FText::FromString("Clearing Mesh"));
 	ProceduralMesh->ClearAllMeshSections();
 }
 
@@ -116,6 +114,10 @@ FVector ATerrain::CalculateDisplacement(const float X, const float Y) const
 
 void ATerrain::Regenerate(FScopedSlowTask& Progress)
 {
+	const float NumOfXVertices = TerrainParameters.Width * TerrainParameters.Density;
+	const float NumOfYVertices = TerrainParameters.Height * TerrainParameters.Density;
+
+
 	UE_LOG(LogTemp, Warning, TEXT("ATerrain::Regenerate"));
 	if(!CliffCurve)
 	{
@@ -123,14 +125,15 @@ void ATerrain::Regenerate(FScopedSlowTask& Progress)
 		return;
 	}
 
-	const float NumOfXVertices = TerrainParameters.Width * TerrainParameters.Density;
-	const float NumOfYVertices = TerrainParameters.Height * TerrainParameters.Density;
-
 	for(int32 y = 0; y < NumOfYVertices; y++)
 	{
+		Progress.EnterProgressFrame(NumOfXVertices, FText::FromString(FString::Printf(TEXT("Generating Vertices..."))));
 		for(int32 x = 0; x < NumOfXVertices; x++)
 		{
-			Progress.EnterProgressFrame(1.f, FText::FromString(FString::Printf(TEXT("Generating Vertices at %d, %d"), x, y)));
+			if(Progress.ShouldCancel())
+			{
+				return;
+			}
 			const FVector2d Position = FVector2D(x / TerrainParameters.Density, y / TerrainParameters.Density);
 			FVector         Vec = FVector(Position.X, Position.Y, 0) + CalculateDisplacement(Position.X, Position.Y);
 
@@ -138,13 +141,18 @@ void ATerrain::Regenerate(FScopedSlowTask& Progress)
 
 			UVCoords.Add(FVector2D(x, y));
 		}
+		FPlatformProcess::Sleep(.5f/NumOfYVertices);
 	}
 
 	for(int32 y = 0; y < NumOfYVertices - 1; y++)
 	{
+		Progress.EnterProgressFrame(NumOfXVertices - 1, FText::FromString(FString::Printf(TEXT("Generating Triangles..."))));
 		for(int32 x = 0; x < NumOfXVertices - 1; x++)
 		{
-			Progress.EnterProgressFrame(1.f, FText::FromString(FString::Printf(TEXT("Generating Triangles at %d, %d"), x, y)));
+			if(Progress.ShouldCancel())
+			{
+				return;
+			}
 			Triangles.Add(x + y * NumOfXVertices);
 			Triangles.Add(x + (y + 1) * NumOfXVertices);
 			Triangles.Add(x + 1 + y * NumOfXVertices);
@@ -153,14 +161,25 @@ void ATerrain::Regenerate(FScopedSlowTask& Progress)
 			Triangles.Add(x + (y + 1) * NumOfXVertices);
 			Triangles.Add(x + 1 + (y + 1) * NumOfXVertices);
 		}
+		FPlatformProcess::Sleep(.5f/NumOfYVertices);
 	}
 
 	if(ProceduralMesh)
 	{
 		Progress.EnterProgressFrame(1.f, FText::FromString("Generating Normals"));
+		if(Progress.ShouldCancel())
+		{
+			return;
+		}
+		FPlatformProcess::Sleep(0.01f);
 		UKismetProceduralMeshLibrary::CalculateTangentsForMesh(Vertices, Triangles, UVCoords, Normals, Tangents);
 
 		Progress.EnterProgressFrame(1.f, FText::FromString("Generating Mesh"));
+		if(Progress.ShouldCancel())
+		{
+			return;
+		}
+		FPlatformProcess::Sleep(0.01f);
 		ProceduralMesh->CreateMeshSection(
 			0,
 			Vertices,
@@ -173,6 +192,11 @@ void ATerrain::Regenerate(FScopedSlowTask& Progress)
 		);
 
 		Progress.EnterProgressFrame(1.f, FText::FromString("Setting Material"));
+		if(Progress.ShouldCancel())
+		{
+			return;
+		}
+		FPlatformProcess::Sleep(0.01f);
 		ProceduralMesh->SetMaterial(0, Material);
 
 	}
