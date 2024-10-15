@@ -51,9 +51,16 @@ public:
 	FVector      CalculateNormal(int32 X, int32 Y) const;
 	float        CalculateDepth(int32 X, int32 Y) const;
 	FVector      GetVertexPosition(int32 X, int32 Y) const;
+	FBox2D       GetBoundingBox2D() const;
+	bool         IsOk() const;
 
-	float MaxHeight = TNumericLimits<float>::Lowest();
-	float MinHeight = TNumericLimits<float>::Max();
+
+	float MaxZ = TNumericLimits<float>::Lowest();
+	float MinZ = TNumericLimits<float>::Max();
+	float MaxX = TNumericLimits<float>::Lowest();
+	float MinX = TNumericLimits<float>::Max();
+	float MaxY = TNumericLimits<float>::Lowest();
+	float MinY = TNumericLimits<float>::Max();
 
 protected:
 	// Called when the game starts or when spawned

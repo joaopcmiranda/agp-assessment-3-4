@@ -16,6 +16,7 @@ class REEFGAME_API AEnvironment : public AActor {
 	FTerrainParameters CachedTerrainParameters;
 
 	void RegenerateEnvironmentInternal();
+	void RegenerateFixedBeingsInternal();
 	bool SetTerrainParams();
 public:
 	// Sets default values for this actor's properties
@@ -24,11 +25,11 @@ public:
 	#if WITH_EDITOR
 
 	void OnConstruction(const FTransform& Transform);
-	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Terrain")
-	void Regenerate();
-	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Terrain")
-	void ForceRegenerate();
-	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Terrain")
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Environment")
+	void RegenerateTerrain();
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Environment")
+	void RegenerateFixedBeings();
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Environment")
 	void ClearFixedBeings();
 
 	void PlaceFixedBeings(FScopedSlowTask& Progress);
@@ -49,35 +50,35 @@ protected:
 	void LogTerrainStatus();
 
 
-	UPROPERTY(EditAnywhere, Category = "Terrain")
+	UPROPERTY(EditAnywhere, Category = "Environment")
 	int32 Width = 20000;
-	UPROPERTY(EditAnywhere, Category = "Terrain")
+	UPROPERTY(EditAnywhere, Category = "Environment")
 	int32 Height = 20000;
 
-	UPROPERTY(EditAnywhere, Category = "Terrain")
+	UPROPERTY(EditAnywhere, Category = "Environment")
 	float Density = 0.002f;
 
-	UPROPERTY(EditAnywhere, Category = "Terrain")
+	UPROPERTY(EditAnywhere, Category = "Environment")
 	float SandBankHeight = 300.0f;
-	UPROPERTY(EditAnywhere, Category = "Terrain")
+	UPROPERTY(EditAnywhere, Category = "Environment")
 	float SandRoughness = 0.0003f;
-	UPROPERTY(VisibleAnywhere, Category = "Terrain")
+	UPROPERTY(VisibleAnywhere, Category = "Environment")
 	float PerlinOffset = 0.0f;
 
-	UPROPERTY(EditAnywhere, Category = "Terrain")
+	UPROPERTY(EditAnywhere, Category = "Environment")
 	float CliffScale = 3000.0f;
-	UPROPERTY(EditAnywhere, Category = "Terrain")
+	UPROPERTY(EditAnywhere, Category = "Environment")
 	float CliffIntensity = 5000.0f;
-	UPROPERTY(EditAnywhere, Category = "Terrain")
+	UPROPERTY(EditAnywhere, Category = "Environment")
 	float CliffRoughness = .0006f;
-	UPROPERTY(EditAnywhere, Category = "Terrain")
+	UPROPERTY(EditAnywhere, Category = "Environment")
 	float CliffRoughnessIntensity = 100.0f;
 
-	UPROPERTY(EditAnywhere, Category = "Terrain")
+	UPROPERTY(EditAnywhere, Category = "Environment")
 	float CliffModifierSeed = 0.0f;
-	UPROPERTY(EditAnywhere, Category = "Terrain")
+	UPROPERTY(EditAnywhere, Category = "Environment")
 	float CliffModifierDensity = 4;
-	UPROPERTY(EditAnywhere, Category = "Terrain")
+	UPROPERTY(EditAnywhere, Category = "Environment")
 	float CliffModifierIntensity = 100;
 
 
@@ -87,18 +88,21 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UChildActorComponent* TerrainComponent;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Environment")
 	UMaterialInterface* TerrainMaterial;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Terrain")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Environment")
 	UCurveVector* CliffCurve;
 
-	UPROPERTY(EditAnywhere, Category="Terrain Fauna/Flora")
+	UPROPERTY(EditAnywhere, Category="Environment")
 	float FixedBeingPlacingPrecision = 0.1f;
-	UPROPERTY(EditAnywhere, Category="Terrain Fauna/Flora")
+	UPROPERTY(EditAnywhere, Category="Environment")
 	int32 FixedBeingPlacingPasses = 5;
 
-	UPROPERTY(EditAnywhere, Category="Terrain Fauna/Flora")
+	UPROPERTY(EditAnywhere, Category="Environment")
+	float ClusterRange = 200.f;
+
+	UPROPERTY(EditAnywhere, Category="Environment")
 	TArray<TSubclassOf<AFixedBeing>> FixedBeingsClasses;
 
 	UPROPERTY()

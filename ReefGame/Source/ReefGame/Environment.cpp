@@ -168,32 +168,12 @@ void AEnvironment::LogTerrainStatus()
 
 // REGENERATION STUFF
 
-void AEnvironment::Regenerate()
-{
-	UE_LOG(LogTemp, Log, TEXT("Regenerating Environment..."));
-	LogTerrainStatus();
-	if(!Terrain)
-	{
-		InitializeTerrain();
-	}
-	// If the terrain parameters have not changed, do not regenerate the environment
-	if(!SetTerrainParams())
-	{
-		return;
-	}
-	AsyncTask(ENamedThreads::GameThread, [this]()
-	{
-		RegenerateEnvironmentInternal();
-	});
-}
-
-void AEnvironment::ForceRegenerate()
+void AEnvironment::RegenerateTerrain()
 {
 	if(!Terrain)
 	{
 		InitializeTerrain();
 	}
-	// If the terrain parameters have not changed, do not regenerate the environment
 	SetTerrainParams();
 	AsyncTask(ENamedThreads::GameThread, [this]()
 	{
@@ -201,10 +181,31 @@ void AEnvironment::ForceRegenerate()
 	});
 }
 
+void AEnvironment::RegenerateFixedBeings()
+{
+
+	if(!Terrain || !Terrain->IsOk())
+	{
+		RegenerateTerrain();
+		return;
+	}
+	AsyncTask(ENamedThreads::GameThread, [this]()
+	{
+		RegenerateFixedBeingsInternal();
+	});
+}
+
 void AEnvironment::ClearFixedBeings()
 {
 	USpawnedActorsEditorSubsystem* Manager = GEditor->GetEditorSubsystem<USpawnedActorsEditorSubsystem>();
 	Manager->ClearAllSpawnedActors();
+	for(int i = Children.Num() - 1; i >= 0; --i)
+	{
+		if(IsValid(Children[i]) && Children[i]->IsA<AFixedBeing>())
+		{
+			Children[i]->Destroy();
+		}
+	}
 }
 
 void AEnvironment::RegenerateEnvironmentInternal()
@@ -227,15 +228,39 @@ void AEnvironment::RegenerateEnvironmentInternal()
 	FScopedSlowTask Progress(NumberOfTasks, FText::FromString("Regenerating Environment"));
 	Progress.MakeDialog(true, true);
 
+	ClearFixedBeings();
 	// Terrain Generation
 	Terrain->ClearLandScape(Progress);
 	Terrain->Regenerate(Progress);
+
+	// Log Bounding Box
+	UE_LOG(LogTemp, Warning, TEXT("Terrain Bounding Box: %s"), *Terrain->GetBoundingBox2D().ToString());
 
 	// Fixed Beings Placement
 	PlaceFixedBeings(Progress);
 }
 
 // FIXED BEINGS STUFF
+
+void AEnvironment::RegenerateFixedBeingsInternal()
+{
+	const float NumOfXVertices = Width * Density;
+	const float NumOfYVertices = Height * Density;
+
+
+	const float NumberOfTasks =
+	+1 // Fixed Beings Preparation
+	+ 1 // Fixed Beings Placement Begin
+	+ FixedBeingPlacingPasses * NumOfXVertices * NumOfYVertices // Fixed Beings Placement
+	;
+	FScopedSlowTask Progress(NumberOfTasks, FText::FromString("Regenerating Environment"));
+	Progress.MakeDialog(true, true);
+
+	// Fixed Beings Placement
+	USpawnedActorsEditorSubsystem* Manager = GEditor->GetEditorSubsystem<USpawnedActorsEditorSubsystem>();
+	Manager->SpawnedActors.Rebound(FBox2D(FVector2D::Zero(), FVector2d(NumOfXVertices, NumOfYVertices)));
+	PlaceFixedBeings(Progress);
+}
 
 void AEnvironment::ReplenishPicker(TArray<TArray<AFixedBeing*>>& Picker)
 {
@@ -296,7 +321,15 @@ void AEnvironment::PlaceFixedBeings(FScopedSlowTask& Progress)
 		}
 	}
 
-	FixedBeings->Empty();
+	for(auto Child : Children)
+	{
+		if(IsValid(Child) && Child->IsA<AFixedBeing>())
+		{
+			Child->Destroy();
+		}
+	}
+
+	Manager->SpawnedActors.RemoveAll();
 
 	ReplenishPicker(Picker);
 
@@ -334,16 +367,17 @@ void AEnvironment::PlaceFixedBeingsPass(TArray<TArray<AFixedBeing*>>& Picker, co
 	USpawnedActorsEditorSubsystem* Manager = GEditor->GetEditorSubsystem<USpawnedActorsEditorSubsystem>();
 	TArray<AFixedBeing*>*          FixedBeings = &(Manager->SpawnedActors);
 
-	int32 y = 0;
+	int32 y = FMath::Floor((1.f / FixedBeingPlacingPrecision) * FMath::RandRange(0.5f, 1.5f) / Pass);
 
 	while(y < NumOfYVertices)
 	{
-		int32 x = 0;
+		int32 x = FMath::Floor((1.f / FixedBeingPlacingPrecision) * FMath::RandRange(0.5f, 1.5f) / Pass);
 
 		while(x < NumOfXVertices)
 		{
 			const float   Depth = Terrain->CalculateDepth(x, y);
 			const FVector Normal = Terrain->CalculateNormal(x, y).GetSafeNormal();
+			const FVector Location = Terrain->GetVertexPosition(x, y);
 			const float   Flatness = FMath::Abs(Normal.Z);
 			const bool    bUpsideDown = Normal.Z < 0;
 
@@ -370,13 +404,64 @@ void AEnvironment::PlaceFixedBeingsPass(TArray<TArray<AFixedBeing*>>& Picker, co
 				float const SkewedFlatnessAffinity = FMath::Lerp(FixedBeing->VerticalAffinity, FixedBeing->FlatAffinity, Flatness);
 				if(FMath::FRand() > SkewedFlatnessAffinity) continue;
 
-				// place the being
-				FVector const Location = Terrain->GetVertexPosition(x, y);
 
+				// Clustering affinity
+
+
+				float       SelfClusterScore = 1.0f;
+				float       GeneralClusterScore = 1.0f;
+				bool        bIsBlocked = false;
+				FVector2D   Point(x, y);
+				auto const& FixedBeingsNearby = FixedBeings.QueryRange(Point, ClusterRange);
+				UE_LOG(LogTemp, Warning, TEXT("FixedBeingsNearby.Num(): %d"), FixedBeingsNearby.Num());
+
+				if(FixedBeingsNearby.Num())
+				{
+					SelfClusterScore = .0f;
+					GeneralClusterScore = .0f;
+					for(auto const& NearbyEntity : FixedBeingsNearby)
+					{
+						const float Distance = FVector2D::Distance(Point, NearbyEntity.Key);
+						if(Distance < FixedBeing->ClusterSpacing)
+						{
+							UE_LOG(LogTemp, Warning, TEXT("Distance: %f Min: %f"), Distance, FixedBeing->ClusterSpacing);
+							bIsBlocked = true;
+							break;
+						}
+
+						const float Weight = 1 - (Distance / ClusterRange);
+
+						if(NearbyEntity.Value->GetClass() == FixedBeing->GetClass())
+						{
+							SelfClusterScore += FMath::Frac(Weight * FixedBeing->SelfClusterAffinity);
+							GeneralClusterScore += FMath::Frac(Weight * FixedBeing->GeneralClusterAffinity);
+						}
+						else
+						{
+							GeneralClusterScore += FMath::Frac(Weight * FixedBeing->GeneralClusterAffinity);
+						}
+
+					}
+
+				}
+
+				if(bIsBlocked) continue;
+
+				if(FMath::FRand() > SelfClusterScore / FixedBeingsNearby.Num()) continue;
+				// UE_LOG(LogTemp, Warning, TEXT("SelfClusterScore passed: %f"), SelfClusterScore);
+				if(FMath::FRand() > GeneralClusterScore / FixedBeingsNearby.Num()) continue;
+				// UE_LOG(LogTemp, Warning, TEXT("GeneralClusterScore passed: %f"), GeneralClusterScore);
+
+				float SingleAffinityScore = (1.0f - FixedBeingsNearby.Num() / (ClusterRange * ClusterRange * ClusterRange / (FixedBeing->ClusterSpacing *
+					FixedBeing->ClusterSpacing * FixedBeing->ClusterSpacing))) * FixedBeing->SingleAffinity;
+
+				if(FMath::FRand() > SingleAffinityScore) continue;
+				// UE_LOG(LogTemp, Warning, TEXT("SingleAffinityScore passed: %f"), SingleAffinityScore);
+
+				// place the being
 				FixedBeing->SetActorRotation(FRotator::ZeroRotator);
 
-				FVector UpVector = FVector::UpVector;
-				FQuat   Rotation;
+				FQuat Rotation;
 
 				if(FixedBeing->bAlwaysPointUp)
 				{

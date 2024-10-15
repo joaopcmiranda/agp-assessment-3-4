@@ -120,13 +120,13 @@ FVector ATerrain::CalculateNormal(int32 const X, int32 const Y) const
 
 float ATerrain::CalculateDepth(int32 const X, int32 const Y) const
 {
-	const float HeightRange = MaxHeight - MinHeight;
+	const float HeightRange = MaxZ - MinZ;
 
 	const float VertexHeight = Vertices[X + Y * (TerrainParameters.Height * TerrainParameters.Density)].Z;
 
 	if(HeightRange > SMALL_NUMBER)
 	{
-		return 1.f - ((VertexHeight - MinHeight) / HeightRange);
+		return 1.f - ((VertexHeight - MinZ) / HeightRange);
 	}
 
 	return 0.f;
@@ -135,6 +135,19 @@ float ATerrain::CalculateDepth(int32 const X, int32 const Y) const
 FVector ATerrain::GetVertexPosition(const int32 X, const int32 Y) const
 {
 	return Vertices[X + Y * (TerrainParameters.Height * TerrainParameters.Density)];
+}
+
+FBox2D ATerrain::GetBoundingBox2D() const
+{
+	const FVector2D Min(MinX, MinY);
+	const FVector2D Max(MaxX, MaxY);
+
+	return FBox2D(Min, Max);
+}
+
+bool ATerrain::IsOk() const
+{
+	return Vertices.Num() > 0 && Triangles.Num() > 0 && ProceduralMesh && Material && CliffCurve;
 }
 
 void ATerrain::Regenerate(FScopedSlowTask& Progress)
@@ -162,15 +175,30 @@ void ATerrain::Regenerate(FScopedSlowTask& Progress)
 			const FVector2d Position = FVector2D(x / TerrainParameters.Density, y / TerrainParameters.Density);
 			FVector         Vec = FVector(Position.X, Position.Y, 0) + CalculateDisplacement(Position.X, Position.Y);
 
-			if(Vec.Z < MinHeight)
+			if(Vec.Z < MinZ)
 			{
-				MinHeight = Vec.Z;
+				MinZ = Vec.Z;
 			}
-			if(Vec.Z > MaxHeight)
+			if(Vec.Z > MaxZ)
 			{
-				MaxHeight = Vec.Z;
+				MaxZ = Vec.Z;
 			}
-
+			if(Vec.X < MinX)
+			{
+				MinX = Vec.X;
+			}
+			if(Vec.X > MaxX)
+			{
+				MaxX = Vec.X;
+			}
+			if(Vec.Y < MinY)
+			{
+				MinY = Vec.Y;
+			}
+			if(Vec.Y > MaxY)
+			{
+				MaxY = Vec.Y;
+			}
 
 			Vertices.Add(Vec);
 
@@ -178,6 +206,11 @@ void ATerrain::Regenerate(FScopedSlowTask& Progress)
 		}
 		FPlatformProcess::Sleep(.5f / NumOfYVertices);
 	}
+
+	// max and min
+	UE_LOG(LogTemp, Warning, TEXT("MaxZ: %f, MinZ: %f"), MaxZ, MinZ);
+	UE_LOG(LogTemp, Warning, TEXT("MaxX: %f, MinX: %f"), MaxX, MinX);
+	UE_LOG(LogTemp, Warning, TEXT("MaxY: %f, MinY: %f"), MaxY, MinY);
 
 	for(int32 y = 0; y < NumOfYVertices - 1; y++)
 	{
