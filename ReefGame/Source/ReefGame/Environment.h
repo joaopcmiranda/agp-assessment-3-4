@@ -7,6 +7,7 @@
 #include "GameFramework/Actor.h"
 #include "Environment.generated.h"
 
+struct FSpawnedBeing;
 class AFixedBeing;
 
 UCLASS()
@@ -18,6 +19,7 @@ class REEFGAME_API AEnvironment : public AActor {
 	void RegenerateEnvironmentInternal();
 	void RegenerateFixedBeingsInternal();
 	bool SetTerrainParams();
+	void PlaceFixedBeingInEnvironment(TArray<TArray<AFixedBeing*>>& Picker, const int32& Pass, TArray<FSpawnedBeing>& FixedBeings, int32 y, int32 x);
 public:
 	// Sets default values for this actor's properties
 	AEnvironment();
@@ -101,6 +103,8 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category="Environment")
 	float ClusterRange = 200.f;
+
+
 
 	UPROPERTY(EditAnywhere, Category="Environment")
 	TArray<TSubclassOf<AFixedBeing>> FixedBeingsClasses;

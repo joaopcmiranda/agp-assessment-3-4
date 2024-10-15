@@ -7,17 +7,31 @@
 #include "SpawnedActorsEditorSubsystem.generated.h"
 
 class AFixedBeing;
+
+USTRUCT()
+struct FSpawnedBeing {
+	GENERATED_BODY()
+
+	FVector            Location;
+	UPROPERTY()
+	AFixedBeing* Actor;
+
+	bool operator==(const FSpawnedBeing& Other) const {
+		return Actor == Other.Actor;
+	}
+};
+
+class AFixedBeing;
 /**
  *
  */
 UCLASS()
-class REEFGAME_API USpawnedActorsEditorSubsystem : public UEditorSubsystem
-{
+class REEFGAME_API USpawnedActorsEditorSubsystem : public UEditorSubsystem {
 	GENERATED_BODY()
 
 public:
 	UPROPERTY()
-	TArray<AFixedBeing*> SpawnedActors;
+	TArray<FSpawnedBeing> SpawnedBeings;
 
 	virtual void Deinitialize() override;
 	void         ClearAllSpawnedActors();

@@ -257,8 +257,6 @@ void AEnvironment::RegenerateFixedBeingsInternal()
 	Progress.MakeDialog(true, true);
 
 	// Fixed Beings Placement
-	USpawnedActorsEditorSubsystem* Manager = GEditor->GetEditorSubsystem<USpawnedActorsEditorSubsystem>();
-	Manager->SpawnedActors.Rebound(FBox2D(FVector2D::Zero(), FVector2d(NumOfXVertices, NumOfYVertices)));
 	PlaceFixedBeings(Progress);
 }
 
@@ -305,11 +303,12 @@ void AEnvironment::PlaceFixedBeings(FScopedSlowTask& Progress)
 	Picker.Init(TArray<AFixedBeing*>(), FixedBeingsClasses.Num());
 
 	USpawnedActorsEditorSubsystem* Manager = GEditor->GetEditorSubsystem<USpawnedActorsEditorSubsystem>();
-	TArray<AFixedBeing*>*          FixedBeings = &(Manager->SpawnedActors);
+	TArray<FSpawnedBeing>&         FixedBeings = Manager->SpawnedBeings;
 
 	// empty Beings into Picker according to class
-	for(auto Actor : *FixedBeings)
+	for(auto [Location, Actor] : FixedBeings)
 	{
+		if(!IsValid(Actor)) continue;
 		for(int32 i = 0; i < FixedBeingsClasses.Num(); i++)
 		{
 			if(Actor->IsA(FixedBeingsClasses[i]))
@@ -321,15 +320,15 @@ void AEnvironment::PlaceFixedBeings(FScopedSlowTask& Progress)
 		}
 	}
 
-	for(auto Child : Children)
+	for(int32 i = Children.Num() - 1; i >= 0; --i)
 	{
-		if(IsValid(Child) && Child->IsA<AFixedBeing>())
+		if(IsValid(Children[i]) && Children[i]->IsA<AFixedBeing>())
 		{
-			Child->Destroy();
+			Children[i]->Destroy();
 		}
 	}
 
-	Manager->SpawnedActors.RemoveAll();
+	Manager->SpawnedBeings.Empty();
 
 	ReplenishPicker(Picker);
 
@@ -344,12 +343,152 @@ void AEnvironment::PlaceFixedBeings(FScopedSlowTask& Progress)
 	// clean picker
 	for(auto& Array : Picker)
 	{
-		for(const auto Actor : Array)
+		for(int32 i = Array.Num() - 1; i >= 0; --i)
 		{
-			Actor->Destroy();
+			Array[i]->Destroy();
 		}
 		Array.Empty();
 	}
+}
+
+void AEnvironment::PlaceFixedBeingInEnvironment(TArray<TArray<AFixedBeing*>>& Picker, const int32& Pass, TArray<FSpawnedBeing>& FixedBeings, int32 y,
+                                                int32                         x)
+{
+	const float   Depth = Terrain->CalculateDepth(x, y);
+	const FVector Normal = Terrain->CalculateNormal(x, y).GetSafeNormal();
+	const FVector Location = Terrain->GetVertexPosition(x, y);
+	const float   Flatness = FMath::Abs(Normal.Z);
+	const bool    bUpsideDown = Normal.Z < 0;
+
+	int32 const CurrentPickerIndex = FMath::RandRange(0, Picker.Num() - 1);
+	if(Picker[CurrentPickerIndex].Num() == 0)
+	{
+		ReplenishPicker(Picker);
+	}
+
+	AFixedBeing* FixedBeing = Picker[CurrentPickerIndex][0];
+	if(!FixedBeing->bIsSpawnable) return;
+	if(FMath::FRand() > FixedBeing->Frequency) return;
+
+	// Is upside down
+	if(!FixedBeing->bCanBeUpsideDown && bUpsideDown) return;
+
+	// Depth affinity
+	float const SkewedDepthAffinity = FMath::Lerp(FixedBeing->ShallowAffinity, FixedBeing->DeepAffinity, Depth);
+	if(FMath::RandRange(0.0f, 1.0f) > SkewedDepthAffinity) return;
+
+	// Slope affinity
+	float const SkewedFlatnessAffinity = FMath::Lerp(FixedBeing->VerticalAffinity, FixedBeing->FlatAffinity, Flatness);
+	if(FMath::FRand() > SkewedFlatnessAffinity) return;
+
+
+	// Clustering affinity
+
+
+	float SelfClusterPositiveScore = 1.f - FixedBeing->SelfClusterAfinity;
+	float SelfClusterNegativeScore = 1.0f;
+	float OthersClusterPositiveScore = 1.f - FixedBeing->OthersClusterAfinity;
+	float OthersClusterNegativeScore = 1.0f;
+
+	int SelfNearbyCount = 0;
+	int OthersNearbyCount = 0;
+
+	if(FixedBeings.Num())
+	{
+		for(const auto& [OtherLocation, Other] : FixedBeings)
+		{
+			const float Distance = FVector::Distance(Location, OtherLocation);
+			if(Distance < FMath::Max(FixedBeing->MinimumSpacing, Other->MinimumSpacing))
+			{
+				return;
+			}
+
+			if(Distance < ClusterRange)
+			{
+
+				const float Weight = FMath::Clamp(1.0f - (Distance - FixedBeing->MinimumSpacing) / ClusterRange, 0.0f, 1.0f);
+
+				if(Other->GetClass() == FixedBeing->GetClass())
+				{
+					SelfNearbyCount++;
+					SelfClusterNegativeScore -= Weight * (FixedBeing->SelfClusterAversion);
+					SelfClusterPositiveScore += Weight * (FixedBeing->SelfClusterAfinity);
+				}
+				else
+				{
+					OthersNearbyCount++;
+					OthersClusterNegativeScore -= Weight * (FixedBeing->OthersClusterAversion);
+					OthersClusterPositiveScore += Weight * (FixedBeing->OthersClusterAfinity);
+				}
+
+			}
+		}
+	}
+
+	if(FMath::FRand() > SelfClusterNegativeScore) return;
+	if(FMath::FRand() > SelfClusterPositiveScore) return;
+	if(FMath::FRand() > OthersClusterNegativeScore) return;
+	if(FMath::FRand() > OthersClusterPositiveScore) return;
+	//
+	// // item # passed
+	// UE_LOG (LogTemp, Warning, TEXT("PASSED: item# %d (%s): SelfClusterPositiveScore: %f, SelfClusterNegativeScore: %f, OthersClusterPositiveScore: %f, OthersClusterNegativeScore: %f, Pass: %d, SelfNearbyCount: %d, OthersNearbyCount: %d"),
+	// 	x * y,
+	// 	*FixedBeing->GetClass()->GetName(),
+	// 	SelfClusterPositiveScore,
+	// 	SelfClusterNegativeScore,
+	// 	OthersClusterPositiveScore,
+	// 	OthersClusterNegativeScore,
+	// 	Pass,
+	// 	SelfNearbyCount,
+	// 	OthersNearbyCount
+	// );
+
+	// store audit info
+	FixedBeing->ItemNumber = x * y;
+	FixedBeing->SkewedDepthAffinity = SkewedDepthAffinity;
+	FixedBeing->SkewedFlatnessAffinity = SkewedFlatnessAffinity;
+	FixedBeing->SelfClusterPositiveScore = SelfClusterPositiveScore;
+	FixedBeing->SelfClusterNegativeScore = SelfClusterNegativeScore;
+	FixedBeing->OthersClusterPositiveScore = OthersClusterPositiveScore;
+	FixedBeing->OthersClusterNegativeScore = OthersClusterNegativeScore;
+	FixedBeing->PlacementPass = Pass;
+	FixedBeing->NumberOfBeingsWhenPlaced = FixedBeings.Num();
+	FixedBeing->NumberOfBeingsNearby = SelfNearbyCount + OthersNearbyCount;
+	FixedBeing->NumberOfOtherBeingsNearby = OthersNearbyCount;
+	FixedBeing->NumberOfSameBeingsNearby = SelfNearbyCount;
+	FixedBeing->ClusterRadius = ClusterRange;
+
+	// place the being
+	FixedBeing->SetActorRotation(FRotator::ZeroRotator);
+
+	FQuat Rotation;
+
+	if(FixedBeing->bAlwaysPointUp)
+	{
+		// Up but random rotation
+		Rotation = FQuat(FRotator(0, FMath::RandRange(0.0f, 360.0f), 0));
+	}
+	else
+	{
+		// Rotate to match normal
+		const FQuat FromUpToNormal = FQuat::FindBetweenNormals(FVector::UpVector, Normal);
+
+		// Apply a random rotation around the normal axis
+		const float RandomRotationAroundNormal = FMath::RandRange(0.0f, 360.0f);
+		const FQuat RandomRotation = FQuat(Normal, FMath::DegreesToRadians(RandomRotationAroundNormal));
+
+		// Combine the rotations
+		Rotation = RandomRotation * FromUpToNormal;
+	}
+
+	// Move FixedBeing to the correct location and rotation
+	FixedBeing->SetActorLocationAndRotation(Location, Rotation);
+
+	FixedBeing->AttachToActor(this, FAttachmentTransformRules::KeepRelativeTransform);
+
+	// remove from picker, add to FixedBeings
+	Picker[CurrentPickerIndex].RemoveAt(0);
+	FixedBeings.Add(FSpawnedBeing{Location, FixedBeing});
 }
 
 void AEnvironment::PlaceFixedBeingsPass(TArray<TArray<AFixedBeing*>>& Picker, const int32& Pass, FScopedSlowTask& Progress)
@@ -365,7 +504,7 @@ void AEnvironment::PlaceFixedBeingsPass(TArray<TArray<AFixedBeing*>>& Picker, co
 	const int32 NumOfYVertices = Height * Density;
 
 	USpawnedActorsEditorSubsystem* Manager = GEditor->GetEditorSubsystem<USpawnedActorsEditorSubsystem>();
-	TArray<AFixedBeing*>*          FixedBeings = &(Manager->SpawnedActors);
+	TArray<FSpawnedBeing>&         FixedBeings = Manager->SpawnedBeings;
 
 	int32 y = FMath::Floor((1.f / FixedBeingPlacingPrecision) * FMath::RandRange(0.5f, 1.5f) / Pass);
 
@@ -375,123 +514,8 @@ void AEnvironment::PlaceFixedBeingsPass(TArray<TArray<AFixedBeing*>>& Picker, co
 
 		while(x < NumOfXVertices)
 		{
-			const float   Depth = Terrain->CalculateDepth(x, y);
-			const FVector Normal = Terrain->CalculateNormal(x, y).GetSafeNormal();
-			const FVector Location = Terrain->GetVertexPosition(x, y);
-			const float   Flatness = FMath::Abs(Normal.Z);
-			const bool    bUpsideDown = Normal.Z < 0;
 
-			// check all beings randomly until one matches or all fail
-			for(int32 _i = 0; _i < Picker.Num(); _i++)
-			{
-				int32 const CurrentPickerIndex = FMath::RandRange(0, Picker.Num() - 1);
-				if(Picker[CurrentPickerIndex].Num() == 0)
-				{
-					ReplenishPicker(Picker);
-				}
-
-				AFixedBeing* FixedBeing = Picker[CurrentPickerIndex][0];
-				if(!FixedBeing->bIsSpawnable) continue;
-
-				// Is upside down
-				if(!FixedBeing->bCanBeUpsideDown && bUpsideDown) continue;
-
-				// Depth affinity
-				float const SkewedDepthAffinity = FMath::Lerp(FixedBeing->ShallowAffinity, FixedBeing->DeepAffinity, Depth);
-				if(FMath::RandRange(0.0f, 1.0f) > SkewedDepthAffinity) continue;
-
-				// Slope affinity
-				float const SkewedFlatnessAffinity = FMath::Lerp(FixedBeing->VerticalAffinity, FixedBeing->FlatAffinity, Flatness);
-				if(FMath::FRand() > SkewedFlatnessAffinity) continue;
-
-
-				// Clustering affinity
-
-
-				float       SelfClusterScore = 1.0f;
-				float       GeneralClusterScore = 1.0f;
-				bool        bIsBlocked = false;
-				FVector2D   Point(x, y);
-				auto const& FixedBeingsNearby = FixedBeings.QueryRange(Point, ClusterRange);
-				UE_LOG(LogTemp, Warning, TEXT("FixedBeingsNearby.Num(): %d"), FixedBeingsNearby.Num());
-
-				if(FixedBeingsNearby.Num())
-				{
-					SelfClusterScore = .0f;
-					GeneralClusterScore = .0f;
-					for(auto const& NearbyEntity : FixedBeingsNearby)
-					{
-						const float Distance = FVector2D::Distance(Point, NearbyEntity.Key);
-						if(Distance < FixedBeing->ClusterSpacing)
-						{
-							UE_LOG(LogTemp, Warning, TEXT("Distance: %f Min: %f"), Distance, FixedBeing->ClusterSpacing);
-							bIsBlocked = true;
-							break;
-						}
-
-						const float Weight = 1 - (Distance / ClusterRange);
-
-						if(NearbyEntity.Value->GetClass() == FixedBeing->GetClass())
-						{
-							SelfClusterScore += FMath::Frac(Weight * FixedBeing->SelfClusterAffinity);
-							GeneralClusterScore += FMath::Frac(Weight * FixedBeing->GeneralClusterAffinity);
-						}
-						else
-						{
-							GeneralClusterScore += FMath::Frac(Weight * FixedBeing->GeneralClusterAffinity);
-						}
-
-					}
-
-				}
-
-				if(bIsBlocked) continue;
-
-				if(FMath::FRand() > SelfClusterScore / FixedBeingsNearby.Num()) continue;
-				// UE_LOG(LogTemp, Warning, TEXT("SelfClusterScore passed: %f"), SelfClusterScore);
-				if(FMath::FRand() > GeneralClusterScore / FixedBeingsNearby.Num()) continue;
-				// UE_LOG(LogTemp, Warning, TEXT("GeneralClusterScore passed: %f"), GeneralClusterScore);
-
-				float SingleAffinityScore = (1.0f - FixedBeingsNearby.Num() / (ClusterRange * ClusterRange * ClusterRange / (FixedBeing->ClusterSpacing *
-					FixedBeing->ClusterSpacing * FixedBeing->ClusterSpacing))) * FixedBeing->SingleAffinity;
-
-				if(FMath::FRand() > SingleAffinityScore) continue;
-				// UE_LOG(LogTemp, Warning, TEXT("SingleAffinityScore passed: %f"), SingleAffinityScore);
-
-				// place the being
-				FixedBeing->SetActorRotation(FRotator::ZeroRotator);
-
-				FQuat Rotation;
-
-				if(FixedBeing->bAlwaysPointUp)
-				{
-					// Up but random rotation
-					Rotation = FQuat(FRotator(0, FMath::RandRange(0.0f, 360.0f), 0));
-				}
-				else
-				{
-					// Rotate to match normal
-					FQuat FromUpToNormal = FQuat::FindBetweenNormals(FVector::UpVector, Normal);
-
-					// Apply a random rotation around the normal axis
-					float RandomRotationAroundNormal = FMath::RandRange(0.0f, 360.0f);
-					FQuat RandomRotation = FQuat(Normal, FMath::DegreesToRadians(RandomRotationAroundNormal));
-
-					// Combine the rotations
-					Rotation = RandomRotation * FromUpToNormal;
-				}
-
-				// Move FixedBeing to the correct location and rotation
-				FixedBeing->SetActorLocationAndRotation(Location, Rotation);
-
-				FixedBeing->AttachToActor(this, FAttachmentTransformRules::KeepRelativeTransform);
-
-				// remove from picker, add to FixedBeings
-				Picker[CurrentPickerIndex].RemoveAt(0);
-				FixedBeings->Add(FixedBeing);
-
-				break;
-			}
+			PlaceFixedBeingInEnvironment(Picker, Pass, FixedBeings, y, x);
 
 			const int32 XAmount = FMath::Floor((1.f / FixedBeingPlacingPrecision) * FMath::RandRange(0.5f, 1.5f) / Pass);
 			x += XAmount;

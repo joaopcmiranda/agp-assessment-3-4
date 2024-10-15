@@ -18,6 +18,8 @@ public:
 	UPROPERTY(EditAnywhere, Category="Fauna/Flora")
 	bool bIsSpawnable = true;
 	UPROPERTY(EditAnywhere, Category="Fauna/Flora")
+	float Frequency = 0.5f;
+	UPROPERTY(EditAnywhere, Category="Fauna/Flora")
 	float FlatAffinity = 0.5f;
 	UPROPERTY(EditAnywhere, Category="Fauna/Flora")
 	float VerticalAffinity = 0.5f;
@@ -26,24 +28,58 @@ public:
 	UPROPERTY(EditAnywhere, Category="Fauna/Flora")
 	float ShallowAffinity = 0.5f;
 	UPROPERTY(EditAnywhere, Category="Fauna/Flora")
-	float SingleAffinity = 0.5f;
+	float OthersClusterAversion = 0.5f;
 	UPROPERTY(EditAnywhere, Category="Fauna/Flora")
-	float GeneralClusterAffinity = 0.5f;
+	float OthersClusterAfinity = 0.5f;
 	UPROPERTY(EditAnywhere, Category="Fauna/Flora")
-	float SelfClusterAffinity = 0.5f;
+	float SelfClusterAversion = 0.5f;
 	UPROPERTY(EditAnywhere, Category="Fauna/Flora")
-	float ClusterSpacing = 0.5f;
+	float SelfClusterAfinity = 0.5f;
+	UPROPERTY(EditAnywhere, Category="Fauna/Flora")
+	float MinimumSpacing = 0.5f;
 	UPROPERTY(EditAnywhere, Category="Fauna/Flora")
 	bool bCanBeUpsideDown = true;
 	UPROPERTY(EditAnywhere, Category="Fauna/Flora")
 	bool bAlwaysPointUp = false;
 
+	UPROPERTY(VisibleAnywhere)
+	int ItemNumber;
+	UPROPERTY(VisibleAnywhere)
+	float SkewedDepthAffinity;
+	UPROPERTY (VisibleAnywhere)
+	float SkewedFlatnessAffinity;
+	UPROPERTY (VisibleAnywhere)
+	float SelfClusterPositiveScore;
+	UPROPERTY (VisibleAnywhere)
+	float SelfClusterNegativeScore;
+	UPROPERTY (VisibleAnywhere)
+	float OthersClusterPositiveScore;
+	UPROPERTY (VisibleAnywhere)
+	float OthersClusterNegativeScore;
+	UPROPERTY(VisibleAnywhere)
+	float PlacementPass;
+	UPROPERTY(VisibleAnywhere)
+	int64 NumberOfBeingsWhenPlaced;
+	UPROPERTY(VisibleAnywhere)
+	int64 NumberOfBeingsNearby;
+	UPROPERTY(VisibleAnywhere)
+	int64 NumberOfOtherBeingsNearby;
+	UPROPERTY(VisibleAnywhere)
+	int64 NumberOfSameBeingsNearby;
+	UPROPERTY(VisibleAnywhere)
+	float ClusterRadius;
+
+	// Called every frame
+	virtual void Tick(float DeltaTime) override;
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
-public:
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
+#if WITH_EDITOR
+	virtual bool ShouldTickIfViewportsOnly() const override;
+	void         OnObjectSelected(UObject* Object);
+	bool         bIsSelected = false;
+#endif
 
 };

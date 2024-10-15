@@ -14,12 +14,12 @@ void USpawnedActorsEditorSubsystem::Deinitialize()
 
 void USpawnedActorsEditorSubsystem::ClearAllSpawnedActors()
 {
-	for (AFixedBeing* Actor : SpawnedActors)
+	for (auto [_, Actor] : SpawnedBeings)
 	{
 		if (Actor && IsValid(Actor))
 		{
 			Actor->Destroy();
 		}
 	}
-	SpawnedActors.Empty();
+	SpawnedBeings.Empty();
 }
