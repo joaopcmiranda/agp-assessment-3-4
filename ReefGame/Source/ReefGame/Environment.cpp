@@ -164,7 +164,7 @@ void AEnvironment::LogTerrainStatus()
 
 
 #if WITH_EDITOR
-#include "SpawnedActorsEditorSubsystem.h"
+#include "FixedBeingsManagerEditorSubsystem.h"
 
 // REGENERATION STUFF
 
@@ -197,8 +197,8 @@ void AEnvironment::RegenerateFixedBeings()
 
 void AEnvironment::ClearFixedBeings()
 {
-	USpawnedActorsEditorSubsystem* Manager = GEditor->GetEditorSubsystem<USpawnedActorsEditorSubsystem>();
-	Manager->ClearAllSpawnedActors();
+	UFixedBeingsManagerEditorSubsystem* Manager = GEditor->GetEditorSubsystem<UFixedBeingsManagerEditorSubsystem>();
+	Manager->ClearAll();
 	for(int i = Children.Num() - 1; i >= 0; --i)
 	{
 		if(IsValid(Children[i]) && Children[i]->IsA<AFixedBeing>())
@@ -302,7 +302,7 @@ void AEnvironment::PlaceFixedBeings(FScopedSlowTask& Progress)
 	TArray<TArray<AFixedBeing*>> Picker;
 	Picker.Init(TArray<AFixedBeing*>(), FixedBeingsClasses.Num());
 
-	USpawnedActorsEditorSubsystem* Manager = GEditor->GetEditorSubsystem<USpawnedActorsEditorSubsystem>();
+	UFixedBeingsManagerEditorSubsystem* Manager = GEditor->GetEditorSubsystem<UFixedBeingsManagerEditorSubsystem>();
 	TArray<FSpawnedBeing>&         FixedBeings = Manager->SpawnedBeings;
 
 	// empty Beings into Picker according to class
@@ -429,19 +429,7 @@ void AEnvironment::PlaceFixedBeingInEnvironment(TArray<TArray<AFixedBeing*>>& Pi
 	if(FMath::FRand() > SelfClusterPositiveScore) return;
 	if(FMath::FRand() > OthersClusterNegativeScore) return;
 	if(FMath::FRand() > OthersClusterPositiveScore) return;
-	//
-	// // item # passed
-	// UE_LOG (LogTemp, Warning, TEXT("PASSED: item# %d (%s): SelfClusterPositiveScore: %f, SelfClusterNegativeScore: %f, OthersClusterPositiveScore: %f, OthersClusterNegativeScore: %f, Pass: %d, SelfNearbyCount: %d, OthersNearbyCount: %d"),
-	// 	x * y,
-	// 	*FixedBeing->GetClass()->GetName(),
-	// 	SelfClusterPositiveScore,
-	// 	SelfClusterNegativeScore,
-	// 	OthersClusterPositiveScore,
-	// 	OthersClusterNegativeScore,
-	// 	Pass,
-	// 	SelfNearbyCount,
-	// 	OthersNearbyCount
-	// );
+
 
 	// store audit info
 	FixedBeing->ItemNumber = x * y;
@@ -503,7 +491,7 @@ void AEnvironment::PlaceFixedBeingsPass(TArray<TArray<AFixedBeing*>>& Picker, co
 	const int32 NumOfXVertices = Width * Density;
 	const int32 NumOfYVertices = Height * Density;
 
-	USpawnedActorsEditorSubsystem* Manager = GEditor->GetEditorSubsystem<USpawnedActorsEditorSubsystem>();
+	UFixedBeingsManagerEditorSubsystem* Manager = GEditor->GetEditorSubsystem<UFixedBeingsManagerEditorSubsystem>();
 	TArray<FSpawnedBeing>&         FixedBeings = Manager->SpawnedBeings;
 
 	int32 y = FMath::Floor((1.f / FixedBeingPlacingPrecision) * FMath::RandRange(0.5f, 1.5f) / Pass);

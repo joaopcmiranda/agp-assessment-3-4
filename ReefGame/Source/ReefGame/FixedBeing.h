@@ -42,31 +42,31 @@ public:
 	UPROPERTY(EditAnywhere, Category="Fauna/Flora")
 	bool bAlwaysPointUp = false;
 
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, Category="Placement")
 	int ItemNumber;
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, Category="Placement")
 	float SkewedDepthAffinity;
-	UPROPERTY (VisibleAnywhere)
+	UPROPERTY (VisibleAnywhere, Category="Placement")
 	float SkewedFlatnessAffinity;
-	UPROPERTY (VisibleAnywhere)
+	UPROPERTY (VisibleAnywhere, Category="Placement")
 	float SelfClusterPositiveScore;
-	UPROPERTY (VisibleAnywhere)
+	UPROPERTY (VisibleAnywhere, Category="Placement")
 	float SelfClusterNegativeScore;
-	UPROPERTY (VisibleAnywhere)
+	UPROPERTY (VisibleAnywhere, Category="Placement")
 	float OthersClusterPositiveScore;
-	UPROPERTY (VisibleAnywhere)
+	UPROPERTY (VisibleAnywhere, Category="Placement")
 	float OthersClusterNegativeScore;
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, Category="Placement")
 	float PlacementPass;
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, Category="Placement")
 	int64 NumberOfBeingsWhenPlaced;
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, Category="Placement")
 	int64 NumberOfBeingsNearby;
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, Category="Placement")
 	int64 NumberOfOtherBeingsNearby;
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, Category="Placement")
 	int64 NumberOfSameBeingsNearby;
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, Category="Placement")
 	float ClusterRadius;
 
 	// Called every frame

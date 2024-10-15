@@ -45,7 +45,6 @@ public:
 	virtual void PostLoad() override;
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 
-protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
@@ -112,7 +111,6 @@ protected:
 	UPROPERTY()
 	ATerrain* Terrain;
 
-public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 };

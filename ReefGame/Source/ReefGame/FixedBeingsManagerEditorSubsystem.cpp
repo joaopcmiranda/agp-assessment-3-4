@@ -1,18 +1,18 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "SpawnedActorsEditorSubsystem.h"
+#include "FixedBeingsManagerEditorSubsystem.h"
 #include "FixedBeing.h"
 
-void USpawnedActorsEditorSubsystem::Deinitialize()
+void UFixedBeingsManagerEditorSubsystem::Deinitialize()
 {
 	Super::Deinitialize();
 
-	ClearAllSpawnedActors();
+	ClearAll();
 }
 
 
-void USpawnedActorsEditorSubsystem::ClearAllSpawnedActors()
+void UFixedBeingsManagerEditorSubsystem::ClearAll()
 {
 	for (auto [_, Actor] : SpawnedBeings)
 	{
@@ -23,3 +23,5 @@ void USpawnedActorsEditorSubsystem::ClearAllSpawnedActors()
 	}
 	SpawnedBeings.Empty();
 }
+
+

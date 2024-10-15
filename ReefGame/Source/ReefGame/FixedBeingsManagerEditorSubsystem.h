@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "EditorSubsystem.h"
-#include "SpawnedActorsEditorSubsystem.generated.h"
+#include "FixedBeingsManagerEditorSubsystem.generated.h"
 
 class AFixedBeing;
 
@@ -26,7 +26,7 @@ class AFixedBeing;
  *
  */
 UCLASS()
-class REEFGAME_API USpawnedActorsEditorSubsystem : public UEditorSubsystem {
+class REEFGAME_API UFixedBeingsManagerEditorSubsystem : public UEditorSubsystem {
 	GENERATED_BODY()
 
 public:
@@ -34,5 +34,5 @@ public:
 	TArray<FSpawnedBeing> SpawnedBeings;
 
 	virtual void Deinitialize() override;
-	void         ClearAllSpawnedActors();
+	void         ClearAll();
 };
