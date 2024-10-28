@@ -1,15 +1,13 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "Environment.h"
-
 #include "Editor.h"
-#include "FixedBeing.h"
-#include "ReefGameInstance.h"
-#include "Terrain.h"
+#include "Flora/FixedBeing.h"
 #include "Async/Async.h"
+#include "Flora/FixedBeingsManagerEditorSubsystem.h"
 #include "Misc/ScopedSlowTask.h"
 
+// SetRootComponent(ProceduralMesh);
+
+class UFixedBeingsManagerEditorSubsystem;
 
 AEnvironment::AEnvironment()
 {
@@ -164,7 +162,6 @@ void AEnvironment::LogTerrainStatus()
 
 
 #if WITH_EDITOR
-#include "FixedBeingsManagerEditorSubsystem.h"
 
 // REGENERATION STUFF
 
