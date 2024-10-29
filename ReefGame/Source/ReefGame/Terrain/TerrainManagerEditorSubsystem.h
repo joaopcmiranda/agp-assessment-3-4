@@ -63,8 +63,6 @@ class UTerrainManagerEditorSubsystem : public UEditorSubsystem {
 	UPROPERTY()
 	FTerrainParameters TerrainParameters;
 
-	int32 NumOfXVertices;
-	int32 NumOfYVertices;
 
 	float    GetNormalisedSkewedDistanceToCentre(const int32 X, const int32 Y) const;
 	float    CalculateHeight(const int32 X, const int32 Y) const;
@@ -74,6 +72,8 @@ class UTerrainManagerEditorSubsystem : public UEditorSubsystem {
 	void     GenerateTangentsNormalsAndMesh(FScopedSlowTask& Progress);
 
 public:
+	int32 NumOfXVertices;
+	int32 NumOfYVertices;
 	float MaxZ = TNumericLimits<float>::Lowest();
 	float MinZ = TNumericLimits<float>::Max();
 	float MaxX = TNumericLimits<float>::Lowest();

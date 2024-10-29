@@ -89,7 +89,7 @@ FVector UTerrainManagerEditorSubsystem::GetNormal(const int32 X, const int32 Y) 
 	{
 		return FVector::ZeroVector;
 	}
-	return Normals[X + Y * NumOfXVertices];
+	return Normals[X + Y * NumOfXVertices].GetSafeNormal();
 }
 
 /**
@@ -160,7 +160,7 @@ FBox UTerrainManagerEditorSubsystem::GetBoundingBox() const
  */
 bool UTerrainManagerEditorSubsystem::IsOk() const
 {
-	return Vertices.Num() > 0 && Triangles.Num() > 0 && ProceduralMesh && Material && CliffCurve;
+	return Vertices.Num() > 0 && Triangles.Num() > 0 && ProceduralMesh && Material && CliffCurve && !bDirty;
 }
 
 // Terrain Generation
@@ -239,6 +239,7 @@ UProceduralMeshComponent* UTerrainManagerEditorSubsystem::GetTerrain(FTerrainPar
 	GenerateTriangles(Progress);
 	GenerateTangentsNormalsAndMesh(Progress);
 
+	bDirty = false;
 	return ProceduralMesh;
 
 }

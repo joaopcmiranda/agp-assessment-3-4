@@ -3,10 +3,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Terrain.h"
 #include "GameFramework/Actor.h"
+#include "Terrain/TerrainManagerEditorSubsystem.h"
 #include "Environment.generated.h"
 
+class UProceduralMeshComponent;
 struct FSpawnedBeing;
 class AFixedBeing;
 
@@ -14,12 +15,9 @@ UCLASS()
 class REEFGAME_API AEnvironment : public AActor {
 	GENERATED_BODY()
 
-	FTerrainParameters CachedTerrainParameters;
-
-	void RegenerateEnvironmentInternal();
-	void RegenerateFixedBeingsInternal();
-	bool SetTerrainParams();
-	void PlaceFixedBeingInEnvironment(TArray<TArray<AFixedBeing*>>& Picker, const int32& Pass, TArray<FSpawnedBeing>& FixedBeings, int32 y, int32 x);
+	void                RegenerateEnvironmentInternal();
+	void                RegenerateFixedBeingsInternal();
+	FTerrainParameters GetTerrainParams() const;
 public:
 	// Sets default values for this actor's properties
 	AEnvironment();
@@ -32,23 +30,11 @@ public:
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Environment")
 	void RegenerateFixedBeings();
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Environment")
-	void ClearFixedBeings();
-
-	void PlaceFixedBeings(FScopedSlowTask& Progress);
-	void ReplenishPicker(TArray<TArray<AFixedBeing*>>& Picker);
-	void PlaceFixedBeingsPass(TArray<TArray<AFixedBeing*>>& Picker, const int32& Pass, FScopedSlowTask& Progress);
 
 	#endif
 
-	void InitializeTerrain();
-
 	virtual void PostLoad() override;
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
-
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
-
-	void LogTerrainStatus();
 
 
 	UPROPERTY(EditAnywhere, Category = "Environment")
@@ -87,7 +73,7 @@ public:
 	USceneComponent* RootSceneComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UChildActorComponent* TerrainComponent;
+	UProceduralMeshComponent* TerrainMeshComponent;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Environment")
 	UMaterialInterface* TerrainMaterial;
@@ -96,21 +82,14 @@ public:
 	UCurveVector* CliffCurve;
 
 	UPROPERTY(EditAnywhere, Category="Environment")
-	float FixedBeingPlacingPrecision = 0.1f;
+	float FixedBeingPlacingPrecision = 0.01f;
 	UPROPERTY(EditAnywhere, Category="Environment")
-	int32 FixedBeingPlacingPasses = 5;
+	int32 FixedBeingPlacingPasses = 100;
 
 	UPROPERTY(EditAnywhere, Category="Environment")
-	float ClusterRange = 200.f;
-
-
+	float ClusterRange = 1000.f;
 
 	UPROPERTY(EditAnywhere, Category="Environment")
 	TArray<TSubclassOf<AFixedBeing>> FixedBeingsClasses;
 
-	UPROPERTY()
-	ATerrain* Terrain;
-
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
 };
