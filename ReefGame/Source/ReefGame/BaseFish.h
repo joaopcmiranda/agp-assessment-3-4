@@ -15,9 +15,21 @@ UENUM(BlueprintType)
 enum class EFishType : uint8
 {
 	BaseFish UMETA(DisplayName = "Base Fish"),
-	FishTypeA UMETA(DisplayName = "Type A"),
-	FishTypeB UMETA(DisplayName = "Type B"),
-	Shark UMETA(DisplayName = "Shark")
+	NullType UMETA(DisplayName = "NullType"),
+	AngelFish UMETA(DisplayName = "AngelFish"),
+	MoorishIdol UMETA(DisplayName = "MoorishIdol"),
+	BlueTang UMETA(DisplayName = "BlueTang"),
+	PurpleTang UMETA(DisplayName = "PurpleTang"),
+	ClownFish UMETA(DisplayName = "ClownFish"),
+	LionFish UMETA(DisplayName = "LionFish"),
+	ParrotFish UMETA(DisplayName = "ParrotFish"),
+	PufferFish UMETA(DisplayName = "PufferFish"),
+	ClownTriggerFish UMETA(DisplayName = "ClownTriggerFish"),
+	Barracuda UMETA(DisplayName = "Barracuda"),
+	Grouper UMETA(DisplayName = "Grouper"),
+	GreatTrevally UMETA(DisplayName = "GreatTrevally"),
+	SailFish UMETA(DisplayName = "SailFish"),
+	Tuna UMETA(DisplayName = "Tuna")
 };
 
 UENUM(BlueprintType)
@@ -74,10 +86,14 @@ protected:
 	ABaseFish* Prey = nullptr;
 
 	UPROPERTY()
-	EFishType PredatorType = EFishType::Shark;
+	EFishType PredatorType = EFishType::NullType;
 
 	UPROPERTY()
-	EFishType PreyType = EFishType::FishTypeB;
+	EFishType PreyTypeA = EFishType::NullType;
+	UPROPERTY()
+    EFishType PreyTypeB = EFishType::NullType;
+    UPROPERTY()
+    EFishType PreyTypeC = EFishType::NullType;
 	
 	void UpdateFishInRadius();
 	void UpdateFishTypes();

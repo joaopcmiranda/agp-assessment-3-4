@@ -4,21 +4,18 @@
 
 #include "CoreMinimal.h"
 #include "BaseFish.h"
-#include "Shark.generated.h"
+#include "BlueTang.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class REEFGAME_API AShark : public ABaseFish
+class REEFGAME_API ABlueTang : public ABaseFish
 {
 	GENERATED_BODY()
 
-public:
-	AShark();
-
 protected:
-	
-	virtual void BeginPlay() override;
+
+	virtual void BeginPlay() override;	
 	
 };

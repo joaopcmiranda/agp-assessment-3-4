@@ -234,20 +234,13 @@ void ABaseFish::UpdateFishTypes()
 			continue;
 		}
 		
-		EFishType MyPreyType = this->PreyType;
 		EFishType OtherFishType = Fish->GetFishType();
-
-		if (this->FishType == EFishType::Shark)
-		{
-			//UE_LOG(LogTemp, Log, TEXT("Shark Detected Fish: %s with Type: %s"), *Fish->GetName(), *UEnum::GetValueAsString(OtherFishType));
-			//UE_LOG(LogTemp, Log, TEXT("Shark's PreyType: %s"), *UEnum::GetValueAsString(MyPreyType));
-		}
 
 		if (Predator == nullptr && OtherFishType == PredatorType)
 		{
 			Predator = Fish;
 		}
-		else if (Prey == nullptr && OtherFishType == PreyType)
+		else if (Prey == nullptr && (OtherFishType == PreyTypeA || OtherFishType == PreyTypeB || OtherFishType == PreyTypeC))
 		{
 			Prey = Fish;
 			UE_LOG(LogTemp, Log, TEXT("Prey detected: %s"), *Prey->GetName());
@@ -282,9 +275,17 @@ void ABaseFish::Steer(float DeltaTime)
 	this->SetActorRotation(Velocity.ToOrientationQuat());
 
 	// Apply steering forces
-	Acceleration += Separate(FishInRadius);
-	Acceleration += Align(FishOfSameType);
-	Acceleration += Cohere(FishOfSameType);
+	if (FishInRadius.Num() > 0)
+	{
+		Acceleration += Separate(FishInRadius);
+		Acceleration += Align(FishOfSameType);
+		Acceleration += Cohere(FishOfSameType);
+	} else
+	{
+		Acceleration += Separate(FishInRadius);
+		Acceleration += Align(FishInRadius);
+		Acceleration += Cohere(FishInRadius);
+	}
 
 	if (IsObstacle())
 	{
@@ -502,11 +503,6 @@ void ABaseFish::Tick(float DeltaTime)
 
 	UpdateFishInRadius();
 	UpdateFishTypes();
-
-	if (this->FishType == EFishType::Shark)
-	{
-		//UE_LOG(LogTemp, Log, TEXT("Current Stark State: %s"), *UEnum::GetValueAsString(CurrentState));
-	}
 
 	if (CurrentState == EFishState::Roam)
 	{
