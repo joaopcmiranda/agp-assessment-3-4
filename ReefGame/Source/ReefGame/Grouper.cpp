@@ -7,5 +7,7 @@ void AGrouper::BeginPlay()
 {
 	Super::BeginPlay();
 	FishType = EFishType::Grouper;
-	PreyTypeA = EFishType::LionFish;
+
+	MinSpeed = 1000.0f;
+	MaxSpeed = 1500.0f;
 }

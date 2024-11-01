@@ -12,6 +12,10 @@
 				"Engine",
 				"EditorSubsystem"
 			]
+		},
+		{
+			"Name": "EnhancedInput",
+			"Type": "Runtime"
 		}
 	],
 	"Plugins": [
