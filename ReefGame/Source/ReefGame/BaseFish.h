@@ -3,6 +3,7 @@
 #pragma once
 
 #include "NiagaraSystem.h"
+#include "HighlightComponent.h"
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "BaseFish.generated.h"
@@ -63,7 +64,7 @@ protected:
 	UPROPERTY(VisibleAnywhere)
 	USphereComponent* FishCollision;
 
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(BlueprintReadOnly)
 	USkeletalMeshComponent* FishMesh;
 
 	UPROPERTY(VisibleAnywhere)
@@ -71,6 +72,10 @@ protected:
 
 	UPROPERTY(VisibleAnywhere)
 	UHealthComponent* HealthComponent;
+
+	UPROPERTY(VisibleAnywhere)
+	UHighlightComponent* HighlightComponent;
+	
 
 //Fish in radius
 	UPROPERTY()
@@ -153,4 +158,10 @@ public:
 	float GetMinSpeed();
 
 	virtual void OnDeath();
+
+	//Highlight
+
+	UFUNCTION(BlueprintImplementableEvent)
+	void Highlight(bool bHighlight);
+	
 };

@@ -1,6 +1,5 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "BaseFish.h"
 #include "HealthComponent.h"
 #include "Components/SphereComponent.h"
@@ -8,12 +7,15 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "NiagaraFunctionLibrary.h"
+#include "HighlightComponent.h"
 
 // Sets default values
 ABaseFish::ABaseFish()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	HealthComponent = CreateDefaultSubobject<UHealthComponent>("Health Component");
+
+	HighlightComponent = CreateDefaultSubobject<UHighlightComponent>(TEXT("Highlight Component"));
 
 	//setupcollision component and set as root
 	FishCollision = CreateDefaultSubobject<USphereComponent>(TEXT("Collision Component"));
@@ -197,7 +199,7 @@ void ABaseFish::UpdateFishTypes()
 		{
 			// Prey is no longer in radius
 			Prey = nullptr;
-			UE_LOG(LogTemp, Log, TEXT("Prey is out of range or invalid. Resetting Prey."));
+			//UE_LOG(LogTemp, Log, TEXT("Prey is out of range or invalid. Resetting Prey."));
 		}
 	}
 	else
@@ -214,7 +216,7 @@ void ABaseFish::UpdateFishTypes()
 		{
 			// Predator is no longer in radius
 			Predator = nullptr;
-			UE_LOG(LogTemp, Log, TEXT("Predator is out of range or invalid. Resetting Predator."));
+			//UE_LOG(LogTemp, Log, TEXT("Predator is out of range or invalid. Resetting Predator."));
 		}
 	}
 	else
@@ -243,7 +245,7 @@ void ABaseFish::UpdateFishTypes()
 		else if (Prey == nullptr && (OtherFishType == PreyTypeA || OtherFishType == PreyTypeB || OtherFishType == PreyTypeC))
 		{
 			Prey = Fish;
-			UE_LOG(LogTemp, Log, TEXT("Prey detected: %s"), *Prey->GetName());
+			//UE_LOG(LogTemp, Log, TEXT("Prey detected: %s"), *Prey->GetName());
 		}
 		// Otherwise, add fish of the same type
 		else if (OtherFishType == this->GetFishType())
@@ -514,7 +516,7 @@ void ABaseFish::Tick(float DeltaTime)
 		else if (Prey != nullptr)
 		{
 			CurrentState = EFishState::Hunt;
-			UE_LOG(LogTemp, Log, TEXT("Entering Hunt Mode"));
+			//UE_LOG(LogTemp, Log, TEXT("Entering Hunt Mode"));
 		}
 	}
 	else if (CurrentState == EFishState::Evade)

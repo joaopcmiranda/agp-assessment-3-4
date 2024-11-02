@@ -2,19 +2,33 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
-#include "InputMappingContext.h"
+#include "PlayerPerceptionSensor.h"
 #include "InputAction.h"
+#include "Blueprint/UserWidget.h"
 #include "Engine/LocalPlayer.h"
 #include "GameFramework/PlayerController.h"
 #include "Kismet/KismetSystemLibrary.h" // For logging functions
+#include "ReefGame/BaseFish.h"
 
 AMyProjectCharacter::AMyProjectCharacter()
 {
     PrimaryActorTick.bCanEverTick = true;
 
-    // Set the character to fly mode to allow movement in all directions
+    PerceptionSensor = CreateDefaultSubobject<UPlayerPerceptionSensor>(TEXT("PerceptionSensor"));
 
-    // Set the max fly speed to 6000
+    // Attach it to the RootComponent or any other component as needed
+    PerceptionSensor->SetupAttachment(RootComponent);
+
+    // Configure the perception sensor
+    PerceptionSensor->SetSphereRadius(500.0f); // Adjust the radius as needed
+    PerceptionSensor->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    PerceptionSensor->SetCollisionObjectType(ECC_WorldDynamic);
+    PerceptionSensor->SetCollisionResponseToAllChannels(ECR_Ignore);
+    PerceptionSensor->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+    PerceptionSensor->SetGenerateOverlapEvents(true);
+
+    InteractPromptWidgetInstance = nullptr;
+    bIsInteractPromptVisible = false;
 }
 
 void AMyProjectCharacter::BeginPlay()
@@ -38,6 +52,54 @@ void AMyProjectCharacter::BeginPlay()
     GetCharacterMovement()->MaxFlySpeed = 4000.0f;
     GetCharacterMovement()->MaxAcceleration = 10000.0f;
     GetCharacterMovement()->BrakingDecelerationFlying = 10000.0f;
+
+    if (PerceptionSensor)
+    {
+        PerceptionSensor->OnHighlightedFishChanged.AddDynamic(this, &AMyProjectCharacter::OnHighlightedFishChanged);
+    }
+
+    // Create and add the interact prompt widget to the viewport
+    if (InteractPromptWidgetClass)
+    {
+        InteractPromptWidgetInstance = CreateWidget<UUserWidget>(GetWorld(), InteractPromptWidgetClass);
+        if (InteractPromptWidgetInstance)
+        {
+            InteractPromptWidgetInstance->AddToViewport();
+            InteractPromptWidgetInstance->SetVisibility(ESlateVisibility::Hidden);
+            bIsInteractPromptVisible = false;
+        }
+    }
+}
+
+void AMyProjectCharacter::OnHighlightedFishChanged(ABaseFish* NewHighlightedFish)
+{
+    if (NewHighlightedFish)
+    {
+        ShowInteractPrompt();
+    }
+    else
+    {
+        HideInteractPrompt();
+    }
+}
+
+void AMyProjectCharacter::ShowInteractPrompt()
+{
+    if (InteractPromptWidgetInstance && !bIsInteractPromptVisible)
+    {
+        InteractPromptWidgetInstance->SetVisibility(ESlateVisibility::Visible);
+        bIsInteractPromptVisible = true;
+    }
+    UE_LOG(LogTemp, Warning, TEXT("Show E"));
+}
+
+void AMyProjectCharacter::HideInteractPrompt()
+{
+    if (InteractPromptWidgetInstance && bIsInteractPromptVisible)
+    {
+        InteractPromptWidgetInstance->SetVisibility(ESlateVisibility::Hidden);
+        bIsInteractPromptVisible = false;
+    }
 }
 
 void AMyProjectCharacter::Tick(float DeltaTime)
@@ -55,6 +117,9 @@ void AMyProjectCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
         // Bind the Move and Look functions to the input actions
         EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AMyProjectCharacter::Move);
         EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AMyProjectCharacter::Look);
+
+        // Bind the Interact action to the Interact function
+        EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &AMyProjectCharacter::Interact);
     }
 }
 
@@ -64,7 +129,7 @@ void AMyProjectCharacter::Move(const FInputActionValue& Value)
     FVector2D MovementVector = Value.Get<FVector2D>();
 
     // Log the raw movement input
-    UE_LOG(LogTemp, Log, TEXT("Move Input: X = %f, Y = %f"), MovementVector.X, MovementVector.Y);
+    //UE_LOG(LogTemp, Log, TEXT("Move Input: X = %f, Y = %f"), MovementVector.X, MovementVector.Y);
 
     if (Controller != nullptr)
     {
@@ -78,17 +143,16 @@ void AMyProjectCharacter::Move(const FInputActionValue& Value)
         FVector ForwardDirection = FRotationMatrix(ControlRotation).GetScaledAxis(EAxis::X);
         FVector RightDirection = FRotationMatrix(ControlRotation).GetScaledAxis(EAxis::Y);
 
-        // Log the control rotation and direction vectors
-        UE_LOG(LogTemp, Log, TEXT("Control Rotation: Pitch = %f, Yaw = %f"), ControlRotation.Pitch, ControlRotation.Yaw);
-        UE_LOG(LogTemp, Log, TEXT("Forward Direction: X = %f, Y = %f, Z = %f"), ForwardDirection.X, ForwardDirection.Y, ForwardDirection.Z);
-        UE_LOG(LogTemp, Log, TEXT("Right Direction: X = %f, Y = %f, Z = %f"), RightDirection.X, RightDirection.Y, RightDirection.Z);
+        // Log the control rotation and direction vectors UE_LO//G(LogTemp, Log, TEXT("Control Rotation: Pitch = %f, Yaw = %f"), ControlRotation.Pitch, ControlRotation.Yaw);
+        //UE_LOG(LogTemp, Log, TEXT("Forward Direction: X = %f, Y = %f, Z = %f"), ForwardDirection.X, ForwardDirection.Y, ForwardDirection.Z);
+        //UE_LOG(LogTemp, Log, TEXT("Right Direction: X = %f, Y = %f, Z = %f"), RightDirection.X, RightDirection.Y, RightDirection.Z);
 
         // Apply movement input
         AddMovementInput(ForwardDirection, MovementVector.Y);
         AddMovementInput(RightDirection, MovementVector.X);
 
         // Log the movement input application
-        UE_LOG(LogTemp, Log, TEXT("Applied Movement Input: Forward = %f, Right = %f"), MovementVector.Y, MovementVector.X);
+        //UE_LOG(LogTemp, Log, TEXT("Applied Movement Input: Forward = %f, Right = %f"), MovementVector.Y, MovementVector.X);
     }
     else
     {
@@ -102,7 +166,7 @@ void AMyProjectCharacter::Look(const FInputActionValue& Value)
     FVector2D LookAxisVector = Value.Get<FVector2D>();
 
     // Log the raw look input
-    UE_LOG(LogTemp, Log, TEXT("Look Input: X = %f, Y = %f"), LookAxisVector.X, LookAxisVector.Y);
+    //UE_LOG(LogTemp, Log, TEXT("Look Input: X = %f, Y = %f"), LookAxisVector.X, LookAxisVector.Y);
 
     if (Controller != nullptr)
     {
@@ -111,10 +175,24 @@ void AMyProjectCharacter::Look(const FInputActionValue& Value)
         AddControllerPitchInput(LookAxisVector.Y);
 
         // Log the application of look input
-        UE_LOG(LogTemp, Log, TEXT("Applied Look Input: Yaw = %f, Pitch = %f"), LookAxisVector.X, LookAxisVector.Y);
+        //UE_LOG(LogTemp, Log, TEXT("Applied Look Input: Yaw = %f, Pitch = %f"), LookAxisVector.X, LookAxisVector.Y);
     }
     else
     {
         UE_LOG(LogTemp, Warning, TEXT("Controller is null in Look()"));
+    }
+}
+
+void AMyProjectCharacter::Interact()
+{
+    if (PerceptionSensor)
+    {
+        ABaseFish* HighlightedFish = PerceptionSensor->GetCurrentlyHighlightedFish();
+        if (HighlightedFish)
+        {
+            EFishType HighlightedFishType = HighlightedFish->GetFishType();
+            FString FishTypeName = UEnum::GetDisplayValueAsText(HighlightedFishType).ToString();
+            UE_LOG(LogTemp, Log, TEXT("Interacting with Fish Type: %s"), *FishTypeName);
+        }
     }
 }
