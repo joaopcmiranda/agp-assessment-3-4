@@ -21,7 +21,7 @@ AMyProjectCharacter::AMyProjectCharacter()
     PerceptionSensor->SetupAttachment(RootComponent);
 
     // Configure the perception sensor
-    PerceptionSensor->SetSphereRadius(500.0f); // Adjust the radius as needed
+    PerceptionSensor->SetSphereRadius(200.0f); // Adjust the radius as needed
     PerceptionSensor->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
     PerceptionSensor->SetCollisionObjectType(ECC_WorldDynamic);
     PerceptionSensor->SetCollisionResponseToAllChannels(ECR_Ignore);
