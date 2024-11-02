@@ -10,12 +10,14 @@
 			"LoadingPhase": "Default",
 			"AdditionalDependencies": [
 				"Engine",
-				"EditorSubsystem"
+				"EditorSubsystem",
+				"UMG"
 			]
 		},
 		{
 			"Name": "EnhancedInput",
-			"Type": "Runtime"
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
 		}
 	],
 	"Plugins": [

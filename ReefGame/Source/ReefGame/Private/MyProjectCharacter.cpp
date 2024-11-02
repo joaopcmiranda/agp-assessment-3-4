@@ -7,7 +7,8 @@
 #include "Blueprint/UserWidget.h"
 #include "Engine/LocalPlayer.h"
 #include "GameFramework/PlayerController.h"
-#include "Kismet/KismetSystemLibrary.h" // For logging functions
+#include "FishCollection.h"
+#include "FishInfoWidget.h"
 #include "ReefGame/BaseFish.h"
 
 AMyProjectCharacter::AMyProjectCharacter()
@@ -68,6 +69,59 @@ void AMyProjectCharacter::BeginPlay()
             InteractPromptWidgetInstance->SetVisibility(ESlateVisibility::Hidden);
             bIsInteractPromptVisible = false;
         }
+    }
+}
+
+void AMyProjectCharacter::Server_AddFishToCollection_Implementation(EFishType FishType)
+{
+    AFishCollection* FishCollectionGameState = GetWorld()->GetGameState<AFishCollection>();
+    if (FishCollectionGameState)
+    {
+        FishCollectionGameState->AddFishToCollection(FishType);
+    }
+}
+
+bool AMyProjectCharacter::Server_AddFishToCollection_Validate(EFishType FishType)
+{
+    return true; // Add any validation logic if needed
+}
+
+void AMyProjectCharacter::ShowFishInfoWidget(EFishType FishType)
+{
+    if (FishInfoWidgetClass)
+    {
+        // Create the widget if it doesn't exist
+        if (!FishInfoWidgetInstance)
+        {
+            FishInfoWidgetInstance = CreateWidget<UUserWidget>(GetWorld(), FishInfoWidgetClass);
+            if (FishInfoWidgetInstance)
+            {
+                FishInfoWidgetInstance->AddToViewport();
+            }
+        }
+
+        if (FishInfoWidgetInstance)
+        {
+            // Cast to your specific widget class if needed
+            UFishInfoWidget* FishInfoWidget = Cast<UFishInfoWidget>(FishInfoWidgetInstance);
+            if (FishInfoWidget)
+            {
+                FishInfoWidget->SetFishType(FishType);
+            }
+
+            // Show the widget
+            FishInfoWidgetInstance->SetVisibility(ESlateVisibility::Visible);
+            bIsFishInfoWidgetDisplayed = true;
+        }
+    }
+}
+
+void AMyProjectCharacter::HideFishInfoWidget()
+{
+    if (FishInfoWidgetInstance)
+    {
+        FishInfoWidgetInstance->SetVisibility(ESlateVisibility::Hidden);
+        bIsFishInfoWidgetDisplayed = false;
     }
 }
 
@@ -185,14 +239,37 @@ void AMyProjectCharacter::Look(const FInputActionValue& Value)
 
 void AMyProjectCharacter::Interact()
 {
-    if (PerceptionSensor)
+    if (bIsFishInfoWidgetDisplayed)
     {
-        ABaseFish* HighlightedFish = PerceptionSensor->GetCurrentlyHighlightedFish();
-        if (HighlightedFish)
+        // Close the fish info widget
+        HideFishInfoWidget();
+    }
+    else
+    {
+        // Proceed with interacting with the highlighted fish
+        if (PerceptionSensor)
         {
-            EFishType HighlightedFishType = HighlightedFish->GetFishType();
-            FString FishTypeName = UEnum::GetDisplayValueAsText(HighlightedFishType).ToString();
-            UE_LOG(LogTemp, Log, TEXT("Interacting with Fish Type: %s"), *FishTypeName);
+            ABaseFish* HighlightedFish = PerceptionSensor->GetCurrentlyHighlightedFish();
+            if (HighlightedFish)
+            {
+                EFishType HighlightedFishType = HighlightedFish->GetFishType();
+                FString FishTypeName = UEnum::GetDisplayValueAsText(HighlightedFishType).ToString();
+                UE_LOG(LogTemp, Log, TEXT("Interacting with Fish Type: %s"), *FishTypeName);
+
+                // Add fish to collection
+                AFishCollection* FishCollectionGameState = GetWorld()->GetGameState<AFishCollection>();
+                if (FishCollectionGameState)
+                {
+                    if (!FishCollectionGameState->IsFishCollected(HighlightedFishType))
+                    {
+                        // Request the server to add the fish to the collection
+                        Server_AddFishToCollection(HighlightedFishType);
+                    }
+                }
+
+                // Show fish info UI
+                ShowFishInfoWidget(HighlightedFishType);
+            }
         }
     }
 }

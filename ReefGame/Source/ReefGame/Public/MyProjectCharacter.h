@@ -34,8 +34,7 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
 	class UInputAction* InteractAction;
-
-
+	
 	// Perception Sensor Component
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Perception")
 	class UPlayerPerceptionSensor* PerceptionSensor;
@@ -44,6 +43,18 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
 	TSubclassOf<class UUserWidget> InteractPromptWidgetClass;
 
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_AddFishToCollection(EFishType FishType);
+
+	// Function to show fish info UI
+	void ShowFishInfoWidget(EFishType FishType);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
+	TSubclassOf<UUserWidget> FishInfoWidgetClass;
+
+	// Add a pointer to the widget instance
+	UUserWidget* FishInfoWidgetInstance;
+
 private:
 	// Instance of the Interact Prompt Widget
 	UPROPERTY()
@@ -51,6 +62,10 @@ private:
 
 	// Flag to track visibility
 	bool bIsInteractPromptVisible;
+
+	bool bIsFishInfoWidgetDisplayed;
+
+	void HideFishInfoWidget();
 
 	// Function to handle highlighted fish changes
 	UFUNCTION()
