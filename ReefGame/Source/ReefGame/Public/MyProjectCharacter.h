@@ -13,6 +13,8 @@ class REEFGAME_API AMyProjectCharacter : public ACharacter
 public:
 	AMyProjectCharacter();
 
+	void ShowCollectionNotification(EFishType FishType);
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -34,7 +36,13 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
 	class UInputAction* InteractAction;
-	
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
+	class UInputAction* OpenCollectionMenuAction;
+
+	void ToggleCollectionMenu();
+	void InitializeCollectionMenu();
+
 	// Perception Sensor Component
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Perception")
 	class UPlayerPerceptionSensor* PerceptionSensor;
@@ -54,6 +62,22 @@ protected:
 
 	// Add a pointer to the widget instance
 	UUserWidget* FishInfoWidgetInstance;
+
+	UPROPERTY()
+	UUserWidget* CollectionNotificationInstance;
+
+	UPROPERTY()
+	UUserWidget* HowToOpenCollectionMenuInstance;
+	
+	void HideCollectionNotification();
+
+	FTimerHandle NotificationTimerHandle;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UI")
+	TSubclassOf<UUserWidget> CollectionNotificationClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UI")
+	TSubclassOf<UUserWidget> HowToOpenCollectionMenuClass;
 
 private:
 	// Instance of the Interact Prompt Widget
@@ -75,6 +99,11 @@ private:
 	void ShowInteractPrompt();
 	void HideInteractPrompt();
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<UUserWidget> CollectionMenuClass;
+
 public:
 	virtual void Tick(float DeltaTime) override;
+
+	UUserWidget* CollectionMenuInstance;
 };

@@ -10,6 +10,7 @@
 #include "FishCollection.h"
 #include "FishInfoWidget.h"
 #include "ReefGame/BaseFish.h"
+#include "UObject/UnrealTypePrivate.h"
 
 AMyProjectCharacter::AMyProjectCharacter()
 {
@@ -70,6 +71,15 @@ void AMyProjectCharacter::BeginPlay()
             bIsInteractPromptVisible = false;
         }
     }
+
+    if (HowToOpenCollectionMenuClass)
+    {
+        HowToOpenCollectionMenuInstance = CreateWidget<UUserWidget>(GetWorld(), HowToOpenCollectionMenuClass);
+        if (HowToOpenCollectionMenuInstance)
+        {
+            HowToOpenCollectionMenuInstance->AddToViewport();
+        }
+    }
 }
 
 void AMyProjectCharacter::Server_AddFishToCollection_Implementation(EFishType FishType)
@@ -113,6 +123,49 @@ void AMyProjectCharacter::ShowFishInfoWidget(EFishType FishType)
             FishInfoWidgetInstance->SetVisibility(ESlateVisibility::Visible);
             bIsFishInfoWidgetDisplayed = true;
         }
+    }
+}
+
+void AMyProjectCharacter::ShowCollectionNotification(EFishType FishType)
+{
+    if (!CollectionNotificationInstance)
+    {
+        // Create the notification widget if it doesn’t already exist
+        CollectionNotificationInstance = CreateWidget<UUserWidget>(GetWorld(), CollectionNotificationClass);
+    }
+
+    if (CollectionNotificationInstance)
+    {
+        // Add to viewport if not already there
+        if (!CollectionNotificationInstance->IsInViewport())
+        {
+            CollectionNotificationInstance->AddToViewport();
+        }
+
+        // Find and call the blueprint function `SetNotificationText`
+        FName FunctionName = FName("SetNotificationText");
+        if (CollectionNotificationInstance->FindFunction(FunctionName))
+        {
+            struct FNotificationParams
+            {
+                EFishType FishType;
+            };
+            FNotificationParams Params;
+            Params.FishType = FishType;
+            
+            CollectionNotificationInstance->ProcessEvent(CollectionNotificationInstance->FindFunction(FunctionName), &Params);
+        }
+
+        // Set a timer to hide the notification after 5 seconds
+        GetWorld()->GetTimerManager().SetTimer(NotificationTimerHandle, this, &AMyProjectCharacter::HideCollectionNotification, 2.5f, false);
+    }
+}
+
+void AMyProjectCharacter::HideCollectionNotification()
+{
+    if (CollectionNotificationInstance)
+    {
+        CollectionNotificationInstance->RemoveFromParent();
     }
 }
 
@@ -168,12 +221,10 @@ void AMyProjectCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
     // Ensure we're using the Enhanced Input Component
     if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
     {
-        // Bind the Move and Look functions to the input actions
         EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AMyProjectCharacter::Move);
         EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AMyProjectCharacter::Look);
-
-        // Bind the Interact action to the Interact function
         EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &AMyProjectCharacter::Interact);
+        EnhancedInputComponent->BindAction(OpenCollectionMenuAction, ETriggerEvent::Started, this, &AMyProjectCharacter::ToggleCollectionMenu);
     }
 }
 
@@ -271,5 +322,89 @@ void AMyProjectCharacter::Interact()
                 ShowFishInfoWidget(HighlightedFishType);
             }
         }
+    }
+}
+
+void AMyProjectCharacter::ToggleCollectionMenu()
+{
+    if (CollectionMenuInstance && CollectionMenuInstance->IsVisible())
+    {
+        // Hide the widget
+        CollectionMenuInstance->SetVisibility(ESlateVisibility::Hidden);
+
+        // Restore input mode to game only
+        APlayerController* PC = Cast<APlayerController>(GetController());
+        if (PC)
+        {
+            PC->SetInputMode(FInputModeGameOnly());
+            PC->bShowMouseCursor = false;
+        }
+    }
+    else
+    {
+        if (!CollectionMenuInstance && CollectionMenuClass)
+        {
+            CollectionMenuInstance = CreateWidget<UUserWidget>(GetWorld(), CollectionMenuClass);
+            if (CollectionMenuInstance)
+            {
+                CollectionMenuInstance->AddToViewport();
+
+                // Initialize the collection menu
+                InitializeCollectionMenu();
+            }
+        }
+        else if (CollectionMenuInstance)
+        {
+            // Show the widget
+            CollectionMenuInstance->SetVisibility(ESlateVisibility::Visible);
+
+            // Re-initialize the collection menu if needed
+            InitializeCollectionMenu();
+        }
+
+        // Set input mode to Game and UI
+        APlayerController* PC = Cast<APlayerController>(GetController());
+        if (PC)
+        {
+            FInputModeGameAndUI InputMode;
+            InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+            PC->SetInputMode(InputMode);
+            PC->bShowMouseCursor = true;
+        }
+    }
+}
+
+void AMyProjectCharacter::InitializeCollectionMenu()
+{
+    AFishCollection* FishCollection = GetWorld()->GetGameState<AFishCollection>();
+    if (FishCollection)
+    {
+        // Load the data table
+        UDataTable* DataTable = LoadObject<UDataTable>(nullptr, TEXT("/Game/UI/DT_FishInfo.DT_FishInfo"));
+        if (!DataTable)
+        {
+            UE_LOG(LogTemp, Error, TEXT("Failed to load DataTable"));
+            return;
+        }
+
+        TSet<EFishType> CollectedFishSet(FishCollection->CollectedFish);
+
+        // Call InitializeCollection event in Blueprint
+        FName FunctionName = FName("SetCollectedFish");
+        if (CollectionMenuInstance->FindFunction(FunctionName))
+        {
+            struct FInitializeCollectionParams
+            {
+                TSet<EFishType> CollectedFishSet;
+            };
+            FInitializeCollectionParams Params;
+            Params.CollectedFishSet = CollectedFishSet;
+
+            CollectionMenuInstance->ProcessEvent(CollectionMenuInstance->FindFunction(FunctionName), &Params);
+        }
+    }
+    else
+    {
+        UE_LOG(LogTemp, Error, TEXT("FishCollection is null"));
     }
 }

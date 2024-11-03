@@ -28,4 +28,8 @@ public:
 	// Check if a fish has been collected
 	UFUNCTION(BlueprintCallable, Category = "Fish Collection")
 	bool IsFishCollected(EFishType FishType) const;
+
+	UPROPERTY()
+	EFishType CurrentCollectedFish;
+	
 };
