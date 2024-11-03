@@ -6,6 +6,7 @@
 #include "HighlightComponent.h"
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "Net/UnrealNetwork.h"
 #include "BaseFish.generated.h"
 
 class UHealthComponent;
@@ -56,10 +57,12 @@ protected:
 	virtual void BeginPlay() override;
 
 //State
+	UPROPERTY(Replicated)
 	EFishState CurrentState = EFishState::Roam;
 
+	UPROPERTY(Replicated)
 	EFishType FishType = EFishType::BaseFish;
-	
+
 //Components
 	UPROPERTY(VisibleAnywhere)
 	USphereComponent* FishCollision;
@@ -75,43 +78,45 @@ protected:
 
 	UPROPERTY(VisibleAnywhere)
 	UHighlightComponent* HighlightComponent;
-	
+
 
 //Fish in radius
-	UPROPERTY()
+	UPROPERTY(Replicated)
 	TArray<AActor*> FishInRadius;
 
-	UPROPERTY()
+	UPROPERTY(Replicated)
 	TArray<AActor*> FishOfSameType;
 
-	UPROPERTY()
+	UPROPERTY(Replicated)
 	ABaseFish* Predator = nullptr;
 
-	UPROPERTY()
+	UPROPERTY(Replicated)
 	ABaseFish* Prey = nullptr;
 
-	UPROPERTY()
+	UPROPERTY(Replicated)
 	EFishType PredatorType = EFishType::NullType;
 
-	UPROPERTY()
+	UPROPERTY(Replicated)
 	EFishType PreyTypeA = EFishType::NullType;
-	UPROPERTY()
+	UPROPERTY(Replicated)
     EFishType PreyTypeB = EFishType::NullType;
-    UPROPERTY()
+    UPROPERTY(Replicated)
     EFishType PreyTypeC = EFishType::NullType;
-	
+
 	void UpdateFishInRadius();
 	void UpdateFishTypes();
 
 //Movement
 
+	UPROPERTY(Replicated)
 	FVector Velocity;
+	UPROPERTY(Replicated)
 	FRotator CurrentRotation;
-	
+
 	float MaxSpeed = 3000.0f;
 	float MinSpeed = 2000.0f;
 
-//MovementFunctions	
+//MovementFunctions
 
 	void UpdateMeshRotation();
 
@@ -126,17 +131,18 @@ protected:
 	virtual void Hunt(float DeltaTime);
 
 	void CapMovementArea();
-	
+
 //Obstacle Avoidance
 
 	bool IsObstacle();
 	FVector AvoidObstacle();
 
+	UPROPERTY(Replicated)
 	TArray<FVector> TargetForces;
 
 //Perception
 	float FOV = FMath::Cos(FMath::DegreesToRadians(120.0f));
-	
+
 //Weighting
 	float CoherenceStrength = 1.9f;
 	float SeparationStrength = 1.6f;
@@ -146,10 +152,20 @@ protected:
 	UPROPERTY(EditDefaultsOnly)
 	UNiagaraSystem* DeathEffect;
 
-public:	
+	// Server RPCs
+	UFUNCTION(BlueprintCallable)
+	void ServerUpdateState();
+	UFUNCTION(Server, Reliable)
+	void ServerOnDeath();
+	UFUNCTION(Server, Reliable)
+	void ServerAddTargetForce(const FVector& TargetForce);
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastSpawnDeathEffect();
+
+public:
 
 	virtual void Tick(float DeltaTime) override;
-	
+
 	void AddTargetForce(FVector TargetForce);
 
 	virtual EFishType GetFishType() const;
@@ -163,5 +179,23 @@ public:
 
 	UFUNCTION(BlueprintImplementableEvent)
 	void Highlight(bool bHighlight);
-	
+
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
+	{
+		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+		DOREPLIFETIME(ABaseFish, CurrentState);
+		DOREPLIFETIME(ABaseFish, FishType);
+		DOREPLIFETIME(ABaseFish, Predator);
+		DOREPLIFETIME(ABaseFish, Prey);
+		DOREPLIFETIME(ABaseFish, PredatorType);
+		DOREPLIFETIME(ABaseFish, PreyTypeA);
+		DOREPLIFETIME(ABaseFish, PreyTypeB);
+		DOREPLIFETIME(ABaseFish, PreyTypeC);
+		DOREPLIFETIME(ABaseFish, Velocity);
+		DOREPLIFETIME(ABaseFish, CurrentRotation);
+		DOREPLIFETIME(ABaseFish, FishInRadius);
+		DOREPLIFETIME(ABaseFish, FishOfSameType);
+	};
+
 };
