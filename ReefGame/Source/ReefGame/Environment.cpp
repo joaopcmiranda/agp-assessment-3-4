@@ -1,5 +1,3 @@
-#pragma optimize("", off)
-
 #include "Environment.h"
 #include "Editor.h"
 #include "ProceduralMeshComponent.h"

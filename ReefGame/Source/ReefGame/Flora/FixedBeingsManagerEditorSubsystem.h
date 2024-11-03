@@ -25,11 +25,11 @@ struct FSpawnedBeing {
 	FVector Location;
 
 	UPROPERTY()
-	AFixedBeing* Being;
+	TWeakObjectPtr<AFixedBeing> Being;
 
 	bool operator==(const FSpawnedBeing& Other) const
 	{
-		return Being == Other.Being;
+		return Being.Get() == Other.Being.Get();
 	}
 };
 
@@ -37,6 +37,7 @@ USTRUCT()
 struct FIndividualPicker {
 	GENERATED_BODY()
 
+	UPROPERTY()
 	TArray<AFixedBeing*> Beings;
 
 	AFixedBeing* operator[](int32 const Index) const
@@ -48,10 +49,9 @@ struct FIndividualPicker {
 		return Beings[Index];
 	}
 	int32 Num() const { return Beings.Num(); }
-	void Add(AFixedBeing* const Being) { Beings.Add(Being); }
-	void Empty() { Beings.Empty(); }
-	void RemoveAt(int32 const Index) { Beings.RemoveAt(Index); }
-
+	void  Add(AFixedBeing* const Being);
+	void  Empty() { Beings.Empty(); }
+	void  RemoveAt(int32 const Index);
 };
 
 

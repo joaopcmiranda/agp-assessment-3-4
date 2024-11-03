@@ -1,7 +1,7 @@
 #include "FixedBeingsManagerEditorSubsystem.h"
 #include "FixedBeing.h"
+#include "AssetRegistry/AssetRegistryModule.h"
 #include "Misc/ScopedSlowTask.h"
-#pragma optimize("", off)
 
 
 // Unreal Overrides
@@ -9,6 +9,7 @@
 void UFixedBeingsManagerEditorSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
+
 }
 
 void UFixedBeingsManagerEditorSubsystem::Deinitialize()
@@ -52,6 +53,7 @@ void UFixedBeingsManagerEditorSubsystem::SetFixedBeingsClasses(TArray<TSubclassO
 }
 
 // Cleaners
+
 /**
  * @brief Clears all the data managed by the Fixed Beings Manager Editor Subsystem.
  *
@@ -73,11 +75,14 @@ void UFixedBeingsManagerEditorSubsystem::ClearAll()
  */
 void UFixedBeingsManagerEditorSubsystem::ClearSpawned()
 {
-	for(auto [_, Actor] : SpawnedBeings)
+	for(auto [_, WeakBeing] : SpawnedBeings)
 	{
-		if(Actor && IsValid(Actor))
+		if(auto Being = WeakBeing.Get())
 		{
-			Actor->Destroy();
+			if(IsValid(Being))
+			{
+				Being->Destroy();
+			}
 		}
 	}
 	SpawnedBeings.Empty();
@@ -89,40 +94,58 @@ void UFixedBeingsManagerEditorSubsystem::CheckChildren(const AActor* Parent)
 	TArray<AActor*> Children;
 	Parent->GetAttachedActors(Children);
 
+	// First, clean up invalid references in SpawnedBeings
+	SpawnedBeings.RemoveAll([](const FSpawnedBeing& SpawnedBeing) {
+		return !SpawnedBeing.Being.IsValid();
+	});
+
 	// iterate through the actors, if they are fixed beings check if they are in the SpawnedBeings or Picker_Internal, if not, destroy them
 	for(const auto& Child : Children)
 	{
-		if(Child->IsA(AFixedBeing::StaticClass()))
+		if(AFixedBeing* FixedBeing = Cast<AFixedBeing>(Child))
 		{
-			if(AFixedBeing* FixedBeing = Cast<AFixedBeing>(Child))
+			bool bFound = false;
+			for(auto& [_, WSpawnedBeing] : SpawnedBeings)
 			{
-				bool bFound = false;
-				for(auto& [_, Actor] : SpawnedBeings)
+				if(WSpawnedBeing.Get() == FixedBeing)
 				{
-					if(Actor == FixedBeing)
-					{
-						bFound = true;
-						break;
-					}
+					bFound = true;
+					break;
 				}
-				if(!bFound)
+			}
+
+			// If not found in SpawnedBeings, check Picker
+			if(!bFound)
+			{
+				for(auto& Array : Picker_Internal)
 				{
-					for(auto& [Beings] : Picker_Internal)
+					for(int32 i = Array.Num()-1; i >= 0; --i)
 					{
-						for(const auto& Being : Beings)
+						if(Array[i] == FixedBeing)
 						{
-							if(Being == FixedBeing)
-							{
-								bFound = true;
-								break;
-							}
+							// Move from picker to spawned
+							SpawnedBeings.Add(FSpawnedBeing{FixedBeing->GetActorLocation(), FixedBeing});
+							Array.RemoveAt(i);
+
+							// unHide the actor
+							FixedBeing->SetActorHiddenInGame(false);
+
+							// Enable collision
+							FixedBeing->SetActorEnableCollision(true);
+
+							FixedBeing->SetActorTickEnabled(true);
+							bFound = true;
+							break;
 						}
 					}
+					if(bFound) break;
 				}
-				if(!bFound)
-				{
-					FixedBeing->Destroy();
-				}
+			}
+
+			// If not found in either collection, register it
+			if(!bFound)
+			{
+				SpawnedBeings.Add(FSpawnedBeing{FixedBeing->GetActorLocation(), FixedBeing});
 			}
 		}
 	}
@@ -163,25 +186,15 @@ void UFixedBeingsManagerEditorSubsystem::DespawnToPicker()
 	auto& Picker = GetPicker();
 	// remove all from the spawned array and organise them in the picker. anything that is not in the picker is destroyed
 	// put all in picker
-	for(auto [_, Actor] : SpawnedBeings)
+	for(auto [_, WActor] : SpawnedBeings)
 	{
-		if(Actor && IsValid(Actor))
+		if(WActor.IsValid() && IsValid(WActor.Get()))
 		{
+			auto Actor = WActor.Get();
 			for(int8 i = 0; i < FixedBeingsClasses.Num(); i++)
 			{
 				if(Actor->IsA(FixedBeingsClasses[i]))
 				{
-					// Detach from parent
-					Actor->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-
-					// Hide the actor
-					Actor->SetActorHiddenInGame(true);
-
-					// Disable collision to make sure it does not interfere with other objects
-					Actor->SetActorEnableCollision(false);
-
-					Actor->SetActorTickEnabled(false);
-
 					Picker[i].Add(Actor);
 					break;
 				}
@@ -191,6 +204,25 @@ void UFixedBeingsManagerEditorSubsystem::DespawnToPicker()
 	// remove from spawned
 	ClearSpawned();
 }
+
+void FIndividualPicker::Add(AFixedBeing* const Being)
+{
+
+	// Detach from parent
+	Being->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+
+	// Hide the actor
+	Being->SetActorHiddenInGame(true);
+
+	// Disable collision to make sure it does not interfere with other objects
+	Being->SetActorEnableCollision(false);
+
+	Being->SetActorTickEnabled(false);
+	Beings.Add(Being);
+}
+
+void FIndividualPicker::RemoveAt(int32 const Index)
+{ Beings.RemoveAt(Index); }
 
 /**
  * @brief Retrieves and initializes the picker array for fixed beings.
@@ -408,8 +440,10 @@ void UFixedBeingsManagerEditorSubsystem::PlaceFixedBeingInEnvironment(const int3
 
 	if(SpawnedBeings.Num())
 	{
-		for(auto& [OtherLocation, Other] : SpawnedBeings)
+		for(auto& [OtherLocation, WOther] : SpawnedBeings)
 		{
+			const auto Other = WOther.Get();
+			if(!Other) continue;
 			const float Distance = FVector::Distance(Location, OtherLocation);
 			if(Distance < FMath::Max(FixedBeing->MinimumSpacing, Other->MinimumSpacing))
 			{
@@ -485,6 +519,15 @@ void UFixedBeingsManagerEditorSubsystem::PlaceFixedBeingInEnvironment(const int3
 
 	// Move FixedBeing to the correct location and rotation
 	FixedBeing->SetActorLocationAndRotation(Location, Rotation);
+
+
+	// unHide the actor
+	FixedBeing->SetActorHiddenInGame(false);
+
+	// Enable collision
+	FixedBeing->SetActorEnableCollision(true);
+
+	FixedBeing->SetActorTickEnabled(true);
 
 	FixedBeing->AttachToActor(Parent, FAttachmentTransformRules::KeepRelativeTransform);
 
