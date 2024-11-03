@@ -39,13 +39,12 @@ UCLASS()
 class UTerrainManagerEditorSubsystem : public UEditorSubsystem {
 	GENERATED_BODY()
 
-	bool bDirty = true;
 
 	UPROPERTY()
 	UCurveVector* CliffCurve;
 
 	UPROPERTY()
-	ATerrain* TerrainActor;
+	TWeakObjectPtr<ATerrain> WTerrainActor;
 
 	UPROPERTY()
 	TArray<FVector> Vertices;
@@ -77,6 +76,7 @@ class UTerrainManagerEditorSubsystem : public UEditorSubsystem {
 	bool    GenerateTangentsNormalsAndMesh(FScopedSlowTask& Progress);
 
 public:
+	bool bDirty = true;
 	int32 NumOfXVertices;
 	int32 NumOfYVertices;
 	float MaxZ = TNumericLimits<float>::Lowest();
@@ -90,9 +90,11 @@ public:
 	void         OnCurveModified(const FAssetData& AssetData);
 	virtual void Deinitialize() override;
 
+	void Release();
+
 	void SetMaterial(UMaterialInterface* NewMaterial);
 
-	void      CheckChildren(const AActor* Parent) const;
+	void      CheckChildren(const AActor* Parent);
 	void      SetCliffCurve(UCurveVector* NewCliffCurve);
 	FVector   GetVertexPosition(float X, float Y) const;
 	FVector   GetNormal(float X, float Y) const;

@@ -97,6 +97,7 @@ class REEFGAME_API UFixedBeingsManagerEditorSubsystem : public UEditorSubsystem 
 public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
+	void ReleaseAll();
 	void         ClearAll();
 	void         ClearSpawned();
 	void         CheckChildren(const AActor* Parent);

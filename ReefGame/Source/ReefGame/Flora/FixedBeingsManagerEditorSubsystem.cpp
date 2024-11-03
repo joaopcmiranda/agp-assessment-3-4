@@ -19,6 +19,12 @@ void UFixedBeingsManagerEditorSubsystem::Deinitialize()
 	ClearAll();
 }
 
+void UFixedBeingsManagerEditorSubsystem::ReleaseAll()
+{
+    SpawnedBeings.Empty();
+    ClearPicker();
+}
+
 // Setters
 
 /**

@@ -1,6 +1,5 @@
 #include "Environment.h"
 #include "Editor.h"
-#include "ProceduralMeshComponent.h"
 #include "Async/Async.h"
 #include "Flora/FixedBeingsManagerEditorSubsystem.h"
 #include "Terrain/Terrain.h"
@@ -69,6 +68,15 @@ FTerrainParameters AEnvironment::GetTerrainParams() const
 
 void AEnvironment::RegenerateTerrain()
 {
+
+	auto const TerrainManager = GEditor->GetEditorSubsystem<UTerrainManagerEditorSubsystem>();
+	if(!TerrainManager)
+	{
+		UE_LOG(LogTemp, Error, TEXT("TerrainManager is not set"));
+		return;
+	}
+	TerrainManager->bDirty = true;
+	TerrainManager->CheckChildren(this);
 	AsyncTask(ENamedThreads::GameThread, [this]
 	{
 		RegenerateEnvironmentInternal();

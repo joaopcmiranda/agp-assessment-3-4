@@ -36,9 +36,9 @@ void UTerrainManagerEditorSubsystem::Initialize(FSubsystemCollectionBase& Collec
 void UTerrainManagerEditorSubsystem::SetMaterial(UMaterialInterface* NewMaterial)
 {
 	Material = NewMaterial;
-	if(TerrainActor && TerrainActor->ProceduralMesh)
+	if(WTerrainActor.IsValid() && WTerrainActor.Get()->ProceduralMesh)
 	{
-		TerrainActor->ProceduralMesh->SetMaterial(0, Material);
+		WTerrainActor.Get()->ProceduralMesh->SetMaterial(0, Material);
 	}
 	else
 	{
@@ -46,7 +46,7 @@ void UTerrainManagerEditorSubsystem::SetMaterial(UMaterialInterface* NewMaterial
 	}
 }
 
-void UTerrainManagerEditorSubsystem::CheckChildren(const AActor* Parent) const
+void UTerrainManagerEditorSubsystem::CheckChildren(const AActor* Parent)
 {
 
 	TArray<AActor*> Children;
@@ -58,14 +58,13 @@ void UTerrainManagerEditorSubsystem::CheckChildren(const AActor* Parent) const
 		{
 			if(ATerrain* Terrain = Cast<ATerrain>(Child))
 			{
-				if(Terrain != TerrainActor)
+				if(Terrain != WTerrainActor.Get())
 				{
 					Terrain->Destroy();
 				}
 			}
 		}
 	}
-
 }
 
 /**
@@ -91,7 +90,7 @@ void UTerrainManagerEditorSubsystem::SetCliffCurve(UCurveVector* NewCliffCurve)
  */
 FVector UTerrainManagerEditorSubsystem::GetVertexPosition(const float X, const float Y) const
 {
-	if(!TerrainActor || !TerrainActor->ProceduralMesh || X < 0 || Y < 0 || X > NumOfXVertices -1 || Y > NumOfYVertices -1)
+	if(!WTerrainActor.IsValid() || !WTerrainActor.Get()->ProceduralMesh || X < 0 || Y < 0 || X > NumOfXVertices -1 || Y > NumOfYVertices -1)
 	{
 		return FVector::ZeroVector;
 	}
@@ -127,7 +126,7 @@ FVector UTerrainManagerEditorSubsystem::GetVertexPosition(const float X, const f
  */
 FVector UTerrainManagerEditorSubsystem::GetNormal(const float X, const float Y) const
 {
-	if(!TerrainActor || !TerrainActor->ProceduralMesh || X < 0 || Y < 0 || X > NumOfXVertices - 1 || Y > NumOfYVertices-1)
+	if(!WTerrainActor.IsValid() || !WTerrainActor.Get()->ProceduralMesh  || X < 0 || Y < 0 || X > NumOfXVertices - 1 || Y > NumOfYVertices-1)
 	{
 		return FVector::ZeroVector;
 	}
@@ -165,7 +164,7 @@ FVector UTerrainManagerEditorSubsystem::GetNormal(const float X, const float Y) 
  */
 float UTerrainManagerEditorSubsystem::GetDepthPercentage(const float X, const float Y) const
 {
-	if(!TerrainActor || !TerrainActor->ProceduralMesh || X < 0 || Y < 0 || X > NumOfXVertices - 1 || Y > NumOfYVertices - 1)
+	if(!WTerrainActor.IsValid() || !WTerrainActor.Get()->ProceduralMesh  || X < 0 || Y < 0 || X > NumOfXVertices - 1 || Y > NumOfYVertices - 1)
 	{
 		return 0.f;
 	}
@@ -239,7 +238,7 @@ FBox UTerrainManagerEditorSubsystem::GetBoundingBox() const
 bool UTerrainManagerEditorSubsystem::IsOk() const
 {
 
-	if(!TerrainActor || !TerrainActor->ProceduralMesh)
+	if(!WTerrainActor.IsValid() || !WTerrainActor.Get()->ProceduralMesh )
 	{
 		return false;
 	}
@@ -279,11 +278,11 @@ bool UTerrainManagerEditorSubsystem::IsOk() const
  */
 ATerrain* UTerrainManagerEditorSubsystem::GetTerrain() const
 {
-	if(!TerrainActor || !TerrainActor->ProceduralMesh || bDirty || !CliffCurve)
+	if(!WTerrainActor.IsValid() || !WTerrainActor.Get()->ProceduralMesh || bDirty || !CliffCurve)
 	{
 		return nullptr;
 	}
-	return TerrainActor;
+	return WTerrainActor.Get();
 }
 
 /**
@@ -318,7 +317,7 @@ ATerrain* UTerrainManagerEditorSubsystem::GetTerrain(FTerrainParameters const& N
  */
 ATerrain* UTerrainManagerEditorSubsystem::GetTerrain(FTerrainParameters const& NewParameters)
 {
-	if(!TerrainActor || !TerrainActor->ProceduralMesh)
+	if(!WTerrainActor.IsValid() || !WTerrainActor.Get()->ProceduralMesh)
 	{
 		UWorld* World = GEditor->GetEditorWorldContext().World();
 		if(!World)
@@ -333,8 +332,8 @@ ATerrain* UTerrainManagerEditorSubsystem::GetTerrain(FTerrainParameters const& N
 
 		const FTransform SpawnTransform(FRotator::ZeroRotator, FVector::ZeroVector);
 
-		TerrainActor = World->SpawnActor<ATerrain>(ATerrain::StaticClass(), SpawnTransform, SpawnParams);
-		if(!TerrainActor)
+		WTerrainActor = World->SpawnActor<ATerrain>(ATerrain::StaticClass(), SpawnTransform, SpawnParams);
+		if(!WTerrainActor.IsValid())
 		{
 			UE_LOG(LogTemp, Error, TEXT("Failed to spawn TerrainActor"));
 			return nullptr;
@@ -345,7 +344,7 @@ ATerrain* UTerrainManagerEditorSubsystem::GetTerrain(FTerrainParameters const& N
 
 	if(!bDirty && NewParameters == TerrainParameters)
 	{
-		return TerrainActor;
+		return WTerrainActor.Get();
 	}
 
 	TerrainParameters = NewParameters;
@@ -385,7 +384,7 @@ ATerrain* UTerrainManagerEditorSubsystem::GetTerrain(FTerrainParameters const& N
 	}
 
 	bDirty = false;
-	return TerrainActor;
+	return WTerrainActor.Get();
 
 }
 
@@ -592,7 +591,7 @@ bool UTerrainManagerEditorSubsystem::GenerateTangentsNormalsAndMesh(FScopedSlowT
 	{
 		return false;
 	}
-	TerrainActor->ProceduralMesh->ClearAllMeshSections();
+	WTerrainActor.Get()->ProceduralMesh->ClearAllMeshSections();
 	Tangents.Empty();
 	Normals.Empty();
 
@@ -610,7 +609,7 @@ bool UTerrainManagerEditorSubsystem::GenerateTangentsNormalsAndMesh(FScopedSlowT
 	{
 		return false;
 	}
-	TerrainActor->ProceduralMesh->CreateMeshSection(
+	WTerrainActor.Get()->ProceduralMesh->CreateMeshSection(
 		0,
 		Vertices,
 		Triangles,
@@ -620,7 +619,7 @@ bool UTerrainManagerEditorSubsystem::GenerateTangentsNormalsAndMesh(FScopedSlowT
 		Tangents,
 		true
 	);
-	TerrainActor->ProceduralMesh->SetMaterial(0, Material);
+	WTerrainActor.Get()->ProceduralMesh->SetMaterial(0, Material);
 	return true;
 }
 
