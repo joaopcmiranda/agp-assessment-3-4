@@ -173,6 +173,7 @@ void AEnvironment::RegenerateFixedBeingsInternal()
 
 	FFixedBeingsParameters const Parameters{FixedBeingPlacingPrecision, FixedBeingPlacingPasses, ClusterRange};
 
+	FBManager->CheckChildren(this);
 	FBManager->RedistributeFixedBeings(Parameters, this, FixedBeingsClasses);
 }
 
