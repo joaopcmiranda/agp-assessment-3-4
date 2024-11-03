@@ -1,6 +1,7 @@
 #include "FixedBeingsManagerEditorSubsystem.h"
 #include "FixedBeing.h"
 #include "Misc/ScopedSlowTask.h"
+#pragma optimize("", off)
 
 
 // Unreal Overrides
@@ -82,6 +83,51 @@ void UFixedBeingsManagerEditorSubsystem::ClearSpawned()
 	SpawnedBeings.Empty();
 }
 
+void UFixedBeingsManagerEditorSubsystem::CheckChildren(const AActor* Parent)
+{
+	TArray<AActor*> Children;
+
+	Parent->GetAllChildActors(Children);
+
+	// iterate through the actors, if they are fixed beings check if they are in the SpawnedBeings or Picker_Internal, if not, destroy them
+	for(const auto& Child : Children)
+	{
+		if(Child->IsA(AFixedBeing::StaticClass()))
+		{
+			if(AFixedBeing* FixedBeing = Cast<AFixedBeing>(Child))
+			{
+				bool bFound = false;
+				for(auto& [_, Actor] : SpawnedBeings)
+				{
+					if(Actor == FixedBeing)
+					{
+						bFound = true;
+						break;
+					}
+				}
+				if(!bFound)
+				{
+					for(auto& [Beings] : Picker_Internal)
+					{
+						for(const auto& Being : Beings)
+						{
+							if(Being == FixedBeing)
+							{
+								bFound = true;
+								break;
+							}
+						}
+					}
+				}
+				if(!bFound)
+				{
+					FixedBeing->Destroy();
+				}
+			}
+		}
+	}
+}
+
 /**
  * @brief Clears all the entries in the Picker_Internal array.
  *
@@ -155,32 +201,75 @@ void UFixedBeingsManagerEditorSubsystem::DespawnToPicker()
  *
  * @return A reference to the Picker array.
  */
-TArray<TArray<AFixedBeing*>>& UFixedBeingsManagerEditorSubsystem::GetPicker()
+TArray<FIndividualPicker>& UFixedBeingsManagerEditorSubsystem::GetPicker()
 {
+	UWorld* World = GEditor->GetEditorWorldContext().World();
+	if(!World)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to get World context"));
+		return Picker_Internal;
+	}
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	SpawnParams.ObjectFlags = RF_Transactional;
+
 	if(Picker_Internal.Num() != FixedBeingsClasses.Num() || bDirty)
 	{
 		ClearPicker();
-		Picker_Internal.Init(TArray<AFixedBeing*>(), FixedBeingsClasses.Num());
+		Picker_Internal.Init(FIndividualPicker(), FixedBeingsClasses.Num());
 	}
 	for(int8 i = 0; i < Picker_Internal.Num(); i++)
 	{
 		if(Picker_Internal[i].Num() == 0)
 		{
-			FActorSpawnParameters SpawnParams;
-			SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-			AFixedBeing* Actor = GetWorld()->SpawnActor<AFixedBeing>(FixedBeingsClasses[i], FVector::ZeroVector, FRotator::ZeroRotator,
-			                                                         SpawnParams);
+			AFixedBeing* Actor = World->SpawnActor<AFixedBeing>(FixedBeingsClasses[i], FVector::ZeroVector, FRotator::ZeroRotator,
+			                                                    SpawnParams);
 			Picker_Internal[i].Add(Actor);
 		}
 	}
+	bDirty = false;
 	return Picker_Internal;
 }
 
 // Placement
 
-void UFixedBeingsManagerEditorSubsystem::RedistributeFixedBeings(FFixedBeingsParameters NewParameters, AActor* Parent)
+void UFixedBeingsManagerEditorSubsystem::RedistributeFixedBeings(FFixedBeingsParameters                  NewParameters, AActor* Parent,
+                                                                 TArray<TSubclassOf<AFixedBeing>> const& NewClasses)
+
 {
+
+	// check if classes are the same
+	bool bFound = false;
+	for(auto& NewClass : NewClasses)
+	{
+		for(auto& OldClass : FixedBeingsClasses)
+		{
+			if(NewClass == OldClass)
+			{
+				bFound = true;
+				break;
+			}
+		}
+	}
+	for(auto& OldClass : FixedBeingsClasses)
+	{
+		for(auto& NewClass : NewClasses)
+		{
+			if(OldClass == NewClass)
+			{
+				bFound = true;
+				break;
+			}
+		}
+	}
+	if(!bFound)
+	{
+		FixedBeingsClasses = NewClasses;
+		bDirty = true;
+	}
+
 	Parameters = NewParameters;
 
 	if(!TerrainManager)
@@ -206,6 +295,7 @@ void UFixedBeingsManagerEditorSubsystem::RedistributeFixedBeings(FFixedBeingsPar
 	+ Parameters.FixedBeingPlacingPasses * TerrainManager->NumOfXVertices * TerrainManager->NumOfYVertices // Fixed Beings Placement
 	;
 	FScopedSlowTask Progress(NumberOfTasks, FText::FromString("Redistributing Fixed Beings"));
+	Progress.MakeDialog(true, true);
 
 	Progress.EnterProgressFrame(1.f, FText::FromString(FString::Printf(TEXT("Preparing Fixed Beings..."))));
 
@@ -238,18 +328,18 @@ void UFixedBeingsManagerEditorSubsystem::PlaceFixedBeingsPass(const int32& Pass,
 	const int32 NumOfXVertices = TerrainManager->NumOfXVertices;
 	const int32 NumOfYVertices = TerrainManager->NumOfYVertices;
 
-	int32 y = GetDeterministicStep(Pass);
+	float y = GetDeterministicStep(Pass, NumOfYVertices);
 
 	while(y < NumOfYVertices)
 	{
-		int32 x = GetDeterministicStep(Pass);
+		float x = GetDeterministicStep(Pass, NumOfXVertices);
 
 		while(x < NumOfXVertices)
 		{
 
 			PlaceFixedBeingInEnvironment(Pass, y, x, Parent);
 
-			const int32 XAmount = GetDeterministicStep(Pass);
+			const float XAmount = GetDeterministicStep(Pass, NumOfXVertices);
 			x += XAmount;
 
 			if(Progress.ShouldCancel())
@@ -258,7 +348,7 @@ void UFixedBeingsManagerEditorSubsystem::PlaceFixedBeingsPass(const int32& Pass,
 				return;
 			}
 		}
-		const int32 YAmount = GetDeterministicStep(Pass);
+		const float YAmount = GetDeterministicStep(Pass, NumOfYVertices);
 		y += YAmount;
 
 		Progress.EnterProgressFrame(YAmount * NumOfXVertices, FText::FromString(FString::Printf(TEXT("Placing Fixed Beings Pass %d..."), Pass)));
@@ -272,13 +362,13 @@ void UFixedBeingsManagerEditorSubsystem::PlaceFixedBeingsPass(const int32& Pass,
 	}
 }
 
-void UFixedBeingsManagerEditorSubsystem::PlaceFixedBeingInEnvironment(const int32& Pass, int32 const Y, int32 const X, AActor* Parent)
+void UFixedBeingsManagerEditorSubsystem::PlaceFixedBeingInEnvironment(const int32& Pass, float const Y, float const X, AActor* Parent)
 {
-	const float Depth = TerrainManager->GetDepthPercentage(X, Y);
+	const float   Depth = TerrainManager->GetDepthPercentage(X, Y);
 	const FVector Normal = TerrainManager->GetNormal(X, Y);
 	const FVector Location = TerrainManager->GetVertexPosition(X, Y);
-	const float Flatness = FMath::Abs(Normal.Z);
-	const bool bUpsideDown = Normal.Z < 0;
+	const float   Flatness = FMath::Abs(Normal.Z);
+	const bool    bUpsideDown = Normal.Z < 0;
 
 	auto& Picker = GetPicker();
 
@@ -298,11 +388,13 @@ void UFixedBeingsManagerEditorSubsystem::PlaceFixedBeingInEnvironment(const int3
 
 	// Depth affinity
 	const float SkewedDepthAffinity = FMath::Lerp(FixedBeing->ShallowAffinity, FixedBeing->DeepAffinity, Depth);
-	if(GetDetRand0To1() > SkewedDepthAffinity) return;
+	auto const  DepthRandom = GetDetRand0To1();
+	if(DepthRandom > SkewedDepthAffinity) return;
 
 	// Slope affinity
 	const float SkewedFlatnessAffinity = FMath::Lerp(FixedBeing->VerticalAffinity, FixedBeing->FlatAffinity, Flatness);
-	if(GetDetRand0To1() > SkewedFlatnessAffinity) return;
+	auto const  SlopeRandom = GetDetRand0To1();
+	if(SlopeRandom > SkewedFlatnessAffinity) return;
 
 	// Clustering affinity
 
@@ -324,7 +416,7 @@ void UFixedBeingsManagerEditorSubsystem::PlaceFixedBeingInEnvironment(const int3
 				return;
 			}
 
-			if (Distance < Parameters.ClusterRange)
+			if(Distance < Parameters.ClusterRange)
 			{
 
 				const float Weight = FMath::Clamp(1.0f - (Distance - FixedBeing->MinimumSpacing) / Parameters.ClusterRange, 0.0f, 1.0f);
@@ -411,29 +503,31 @@ void UFixedBeingsManagerEditorSubsystem::PlaceFixedBeingInEnvironment(const int3
 float UFixedBeingsManagerEditorSubsystem::GetDetRand0To1()
 {
 	// Use golden ratio to create a mostly even distribution
-	constexpr float GoldenRatioConjugate = 0.618033988749895f;
+	const float GoldenRatioConjugate = (FMath::Sqrt(5.f) - 1) / 2;
 
-	SelectionSeed++;
-	return FMath::Fmod(SelectionSeed * GoldenRatioConjugate, 1.0f);
+	SelectionSeed = (SelectionSeed + 1) % 100000000;
+	return FMath::Fmod(SelectionSeed * SelectionSeed * GoldenRatioConjugate, 1.0f);
 }
 
 /**
  * @brief Computes a deterministic step to move the  placer.
  *
  * @param Pass The current pass number, affecting the step size calculation.
+ * @param ArraySize
  *
  * @return The computed step size as an integer.
  */
-int32 UFixedBeingsManagerEditorSubsystem::GetDeterministicStep(const int32& Pass)
+float UFixedBeingsManagerEditorSubsystem::GetDeterministicStep(const int32& Pass, const int32 ArraySize)
 {
-	// Use golden ratio to create a mostly even distribution
-	constexpr float GoldenRatioConjugate = 0.618033988749895f;
 
-	StepSeed++;
-	const float RandomFrac = 0.5f + (FMath::Fmod(StepSeed * GoldenRatioConjugate, 1.0f));
+	// Use golden ratio to create a mostly even distribution
+	const double GoldenRatioConjugate = (FMath::Sqrt(5.0) - 1.0) / 2.0;
+
+	StepSeed = (StepSeed + 1) % 100000000;
+	const double RandomFrac = 0.1  + (FMath::Fmod(StepSeed * GoldenRatioConjugate, 1.0 ));
 
 	// Precision will pull it down for smaller increments, Pass will also pull it down
-	return FMath::Floor( RandomFrac / (Pass * Parameters.FixedBeingPlacingPrecision));
+	return RandomFrac * (ArraySize / (Pass * Parameters.FixedBeingPlacingPrecision));
 }
 
 /**
@@ -444,14 +538,21 @@ int32 UFixedBeingsManagerEditorSubsystem::GetDeterministicStep(const int32& Pass
  */
 int32 UFixedBeingsManagerEditorSubsystem::GetDeterministicPickerIndex()
 {
-	PickerIndexSeed++;
-
 	const int32 NumClasses = FixedBeingsClasses.Num();
 	if(NumClasses <= 0)
 	{
 		return 0;
 	}
 
-	// Use Primes for a simple distribution
-	return (PickerIndexSeed * 13 + PickerIndexSeed * 7) % NumClasses;
+	// Use golden ratio to create a mostly even distribution
+	const double GoldenRatioConjugate = (FMath::Sqrt(5.0) - 1.0) / 2.0;
+
+	PickerIndexSeed = (PickerIndexSeed + 1) % 100000;
+
+	// Use doubles consistently and ensure positive result
+	double result = PickerIndexSeed * PickerIndexSeed * GoldenRatioConjugate;
+	result = FMath::Fmod(result, 1.0);  // Use 1.0 not 1.0f
+	if(result < 0) result = FMath::Abs(result);  // Ensure positive
+
+	return FMath::Floor(result * NumClasses);
 }

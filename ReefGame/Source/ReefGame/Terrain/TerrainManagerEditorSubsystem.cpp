@@ -1,10 +1,13 @@
-﻿#include "TerrainManagerEditorSubsystem.h"
+#pragma optimize("", off)
+
+#include "TerrainManagerEditorSubsystem.h"
 
 #include "KismetProceduralMeshLibrary.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Misc/ScopedSlowTask.h"
 #include "Curves/CurveVector.h"
 #include "ProceduralMeshComponent.h"
+#include "Editor.h"
 
 
 // Unreal Overrides
@@ -34,14 +37,37 @@ void UTerrainManagerEditorSubsystem::Initialize(FSubsystemCollectionBase& Collec
 void UTerrainManagerEditorSubsystem::SetMaterial(UMaterialInterface* NewMaterial)
 {
 	Material = NewMaterial;
-	if(ProceduralMesh)
+	if(TerrainActor && TerrainActor->ProceduralMesh)
 	{
-		ProceduralMesh->SetMaterial(0, Material);
+		TerrainActor->ProceduralMesh->SetMaterial(0, Material);
 	}
 	else
 	{
 		bDirty = true;
 	}
+}
+
+void UTerrainManagerEditorSubsystem::CheckChildren(const AActor* Parent) const
+{
+	auto Children = TArray<AActor*>();
+
+	Parent->GetAllChildActors(Children);
+
+	// iterate through the actors, if they are ATerrain check if they match TerrainActor, if not, destrooy them
+	for(const auto& Child : Children)
+	{
+		if(Child->IsA(ATerrain::StaticClass()))
+		{
+			if(ATerrain* Terrain = Cast<ATerrain>(Child))
+			{
+				if(Terrain != TerrainActor)
+				{
+					Terrain->Destroy();
+				}
+			}
+		}
+	}
+
 }
 
 /**
@@ -65,13 +91,31 @@ void UTerrainManagerEditorSubsystem::SetCliffCurve(UCurveVector* NewCliffCurve)
  * @param Y The Y coordinate of the vertex.
  * @return The position of the vertex as an FVector. If the procedural mesh is not set, returns FVector::ZeroVector.
  */
-FVector UTerrainManagerEditorSubsystem::GetVertexPosition(const int32 X, const int32 Y) const
+FVector UTerrainManagerEditorSubsystem::GetVertexPosition(const float X, const float Y) const
 {
-	if(!ProceduralMesh || X < 0 || Y < 0 || X >= NumOfXVertices || Y >= NumOfYVertices)
+	if(!TerrainActor || !TerrainActor->ProceduralMesh || X < 0 || Y < 0 || X > NumOfXVertices -1 || Y > NumOfYVertices -1)
 	{
 		return FVector::ZeroVector;
 	}
-	return Vertices[X + Y * NumOfXVertices];
+
+	const int32 X0 = FMath::FloorToInt(X);
+	const int32 X1 = X < NumOfXVertices - 1 ? FMath::CeilToInt(X) : NumOfXVertices - 1;
+	const int32 Y0 = FMath::FloorToInt(Y);
+	const int32 Y1 = Y < NumOfYVertices - 1 ? FMath::CeilToInt(Y) : NumOfYVertices - 1;
+
+	const auto FracX = X - X0;
+	const auto FracY = Y - Y0;
+
+	const auto Vertex00 = Vertices[X0 + Y0 * NumOfXVertices];
+	const auto Vertex01 = Vertices[X0 + Y1 * NumOfXVertices];
+	const auto Vertex10 = Vertices[X1 + Y0 * NumOfXVertices];
+	const auto Vertex11 = Vertices[X1 + Y1 * NumOfXVertices];
+
+	return FMath::Lerp(
+        FMath::Lerp(Vertex00, Vertex01, FracY),
+        FMath::Lerp(Vertex10, Vertex11, FracY),
+        FracX);
+
 }
 
 
@@ -83,13 +127,33 @@ FVector UTerrainManagerEditorSubsystem::GetVertexPosition(const int32 X, const i
  * @param Y The Y coordinate of the vertex.
  * @return The normal vector at the specified vertex coordinates.
  */
-FVector UTerrainManagerEditorSubsystem::GetNormal(const int32 X, const int32 Y) const
+FVector UTerrainManagerEditorSubsystem::GetNormal(const float X, const float Y) const
 {
-	if(!ProceduralMesh || X < 0 || Y < 0 || X >= NumOfXVertices || Y >= NumOfYVertices)
+	if(!TerrainActor || !TerrainActor->ProceduralMesh || X < 0 || Y < 0 || X > NumOfXVertices - 1 || Y > NumOfYVertices-1)
 	{
 		return FVector::ZeroVector;
 	}
-	return Normals[X + Y * NumOfXVertices].GetSafeNormal();
+
+	const int32 X0 = FMath::FloorToInt(X);
+	const int32 X1 = X < NumOfXVertices - 1 ? FMath::CeilToInt(X) : NumOfXVertices - 1;
+	const int32 Y0 = FMath::FloorToInt(Y);
+	const int32 Y1 = Y < NumOfYVertices - 1 ? FMath::CeilToInt(Y) : NumOfYVertices - 1;
+
+	const auto FracX = X - X0;
+	const auto FracY = Y - Y0;
+
+	const auto Normal00 = Normals[X0 + Y0 * NumOfXVertices];
+	const auto Normal01 = Normals[X0 + Y1 * NumOfXVertices];
+	const auto Normal10 = Normals[X1 + Y0 * NumOfXVertices];
+	const auto Normal11 = Normals[X1 + Y1 * NumOfXVertices];
+
+	const auto VertexNormal = FMath::Lerp(
+        FMath::Lerp(Normal00, Normal01, FracY),
+        FMath::Lerp(Normal10, Normal11, FracY),
+        FracX);
+
+	return VertexNormal.GetSafeNormal();
+
 }
 
 /**
@@ -101,16 +165,32 @@ FVector UTerrainManagerEditorSubsystem::GetNormal(const int32 X, const int32 Y) 
  * @param Y  The Y-coordinate of the vertex in the mesh.
  * @return A float representing the depth percentage. If the coordinates are out of bounds or the mesh is not set, returns 0.f.
  */
-float UTerrainManagerEditorSubsystem::GetDepthPercentage(const int32 X, const int32 Y) const
+float UTerrainManagerEditorSubsystem::GetDepthPercentage(const float X, const float Y) const
 {
-	if(!ProceduralMesh || X < 0 || Y < 0 || X >= NumOfXVertices || Y >= NumOfYVertices)
+	if(!TerrainActor || !TerrainActor->ProceduralMesh || X < 0 || Y < 0 || X > NumOfXVertices - 1 || Y > NumOfYVertices - 1)
 	{
 		return 0.f;
 	}
 
 	const float HeightRange = MaxZ - MinZ;
 
-	const float VertexHeight = Vertices[X + Y * NumOfXVertices].Z;
+	const int32 X0 = FMath::FloorToInt(X);
+    const int32 X1 = X < NumOfXVertices - 1 ? FMath::CeilToInt(X) : NumOfXVertices - 1;
+	const int32 Y0 = FMath::FloorToInt(Y);
+	const int32 Y1 = Y < NumOfYVertices - 1 ? FMath::CeilToInt(Y) : NumOfYVertices - 1;
+
+	const auto FracX = X - X0;
+	const auto FracY = Y - Y0;
+
+	const auto Height00 = Vertices[X0 + Y0 * NumOfXVertices].Z;
+	const auto Height01 = Vertices[X0 + Y1 * NumOfXVertices].Z;
+	const auto Height10 = Vertices[X1 + Y0 * NumOfXVertices].Z;
+	const auto Height11 = Vertices[X1 + Y1 * NumOfXVertices].Z;
+
+	const auto VertexHeight = FMath::Lerp(
+		FMath::Lerp(Height00, Height01, FracY),
+		FMath::Lerp(Height10, Height11, FracY),
+		FracX);
 
 	if(HeightRange > SMALL_NUMBER)
 	{
@@ -160,7 +240,36 @@ FBox UTerrainManagerEditorSubsystem::GetBoundingBox() const
  */
 bool UTerrainManagerEditorSubsystem::IsOk() const
 {
-	return Vertices.Num() > 0 && Triangles.Num() > 0 && ProceduralMesh && Material && CliffCurve && !bDirty;
+
+	if(!TerrainActor || !TerrainActor->ProceduralMesh)
+	{
+		return false;
+	}
+
+	if(!Material)
+	{
+		return false;
+	}
+
+	if(!CliffCurve)
+	{
+		return false;
+	}
+
+	if(Vertices.Num() == 0)
+	{
+		return false;
+	}
+
+	if(Triangles.Num() == 0)
+	{
+		return false;
+	}
+	if(bDirty)
+	{
+		return false;
+	}
+	return true;
 }
 
 // Terrain Generation
@@ -170,13 +279,13 @@ bool UTerrainManagerEditorSubsystem::IsOk() const
  *
  * @return The terrain mesh
  */
-UProceduralMeshComponent* UTerrainManagerEditorSubsystem::GetTerrain() const
+ATerrain* UTerrainManagerEditorSubsystem::GetTerrain() const
 {
-	if(!ProceduralMesh || bDirty || !CliffCurve)
+	if(!TerrainActor || !TerrainActor->ProceduralMesh || bDirty || !CliffCurve)
 	{
 		return nullptr;
 	}
-	return ProceduralMesh;
+	return TerrainActor;
 }
 
 /**
@@ -185,10 +294,15 @@ UProceduralMeshComponent* UTerrainManagerEditorSubsystem::GetTerrain() const
  * @param NewParameters The parameters defining the terrain.
  * @param NewMaterial The material to apply to the terrain.
  * @param NewCliffCurve The curve vector used for cliff generation.
- * @return A pointer to the generated or updated UProceduralMeshComponent.
+ * @return A pointer to the generated or updated ATerrain.
  */
-UProceduralMeshComponent* UTerrainManagerEditorSubsystem::GetTerrain(FTerrainParameters const& NewParameters, UMaterialInterface* NewMaterial, UCurveVector* NewCliffCurve)
+ATerrain* UTerrainManagerEditorSubsystem::GetTerrain(FTerrainParameters const& NewParameters, UMaterialInterface* NewMaterial,
+                                                     UCurveVector*             NewCliffCurve)
 {
+	if(!NewMaterial || !NewCliffCurve || (!bDirty && NewParameters == TerrainParameters))
+	{
+		return GetTerrain();
+	}
 	bDirty = true;
 	SetMaterial(NewMaterial);
 	SetCliffCurve(NewCliffCurve);
@@ -204,18 +318,39 @@ UProceduralMeshComponent* UTerrainManagerEditorSubsystem::GetTerrain(FTerrainPar
  * @param NewParameters  The parameters to set
  * @return The terrain mesh
  */
-UProceduralMeshComponent* UTerrainManagerEditorSubsystem::GetTerrain(FTerrainParameters const& NewParameters)
+ATerrain* UTerrainManagerEditorSubsystem::GetTerrain(FTerrainParameters const& NewParameters)
 {
-	if(!ProceduralMesh)
+	if(!TerrainActor || !TerrainActor->ProceduralMesh)
 	{
-		ProceduralMesh = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("Procedural Mesh"));
+		UWorld* World = GEditor->GetEditorWorldContext().World();
+		if(!World)
+		{
+			UE_LOG(LogTemp, Error, TEXT("Failed to get World context"));
+			return nullptr;
+		}
+
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		SpawnParams.ObjectFlags = RF_Transactional;
+
+		const FTransform SpawnTransform(FRotator::ZeroRotator, FVector::ZeroVector);
+
+		TerrainActor = World->SpawnActor<ATerrain>(ATerrain::StaticClass(), SpawnTransform, SpawnParams);
+		if(!TerrainActor)
+		{
+			UE_LOG(LogTemp, Error, TEXT("Failed to spawn TerrainActor"));
+			return nullptr;
+		}
+
 		bDirty = true;
 	}
 
 	if(!bDirty && NewParameters == TerrainParameters)
 	{
-		return ProceduralMesh;
+		return TerrainActor;
 	}
+
+	TerrainParameters = NewParameters;
 
 	if(!CliffCurve)
 	{
@@ -235,12 +370,24 @@ UProceduralMeshComponent* UTerrainManagerEditorSubsystem::GetTerrain(FTerrainPar
 	FScopedSlowTask Progress(NumberOfTasks, FText::FromString("Regenerating Environment"));
 	Progress.MakeDialog(true, true);
 
-	GenerateVertices(Progress);
-	GenerateTriangles(Progress);
-	GenerateTangentsNormalsAndMesh(Progress);
+	if(!GenerateVertices(Progress))
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to generate vertices"));
+		return nullptr;
+	}
+	if(!GenerateTriangles(Progress))
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to generate triangles"));
+		return nullptr;
+	}
+	if(!GenerateTangentsNormalsAndMesh(Progress))
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to generate tangents, normals, or mesh"));
+		return nullptr;
+	}
 
 	bDirty = false;
-	return ProceduralMesh;
+	return TerrainActor;
 
 }
 
@@ -298,7 +445,7 @@ float UTerrainManagerEditorSubsystem::CalculateHeight(const int32 X, const int32
 	// The noise for the cliff modifier
 	const float Modifier = FMath::PerlinNoise2D(
 		FVector2d((X + TerrainParameters.CliffModifierSeed) * TerrainParameters.CliffModifierDensity,
-				  (Y + TerrainParameters.CliffModifierSeed) * TerrainParameters.CliffModifierDensity)) * TerrainParameters.CliffModifierIntensity;
+		          (Y + TerrainParameters.CliffModifierSeed) * TerrainParameters.CliffModifierDensity)) * TerrainParameters.CliffModifierIntensity;
 
 	const float SandbankHeight = SandNoise * (1 - ZCurve);
 	const float CliffHeight = ZCurve * TerrainParameters.CliffIntensity;
@@ -338,7 +485,7 @@ FVector UTerrainManagerEditorSubsystem::CalculateDisplacement(const int32 X, con
 /**
  * Generate Vertices
  */
-void UTerrainManagerEditorSubsystem::GenerateVertices(FScopedSlowTask& Progress)
+bool UTerrainManagerEditorSubsystem::GenerateVertices(FScopedSlowTask& Progress)
 {
 	Progress.EnterProgressFrame(1.f, FText::FromString("Clearing Vertices/UVs..."));
 	FPlatformProcess::Sleep(.01f);
@@ -362,7 +509,7 @@ void UTerrainManagerEditorSubsystem::GenerateVertices(FScopedSlowTask& Progress)
 		{
 			if(Progress.ShouldCancel())
 			{
-				return;
+				return false;
 			}
 			const FVector2d Position = FVector2D(x / TerrainParameters.Density, y / TerrainParameters.Density);
 			FVector         Vec = FVector(Position.X, Position.Y, 0) + CalculateDisplacement(Position.X, Position.Y);
@@ -398,12 +545,14 @@ void UTerrainManagerEditorSubsystem::GenerateVertices(FScopedSlowTask& Progress)
 			FPlatformProcess::Sleep(.5f / NumOfYVertices);
 		}
 	}
+	return true;
 }
+
 /**
  * Generate Triangles
  *
  */
-void UTerrainManagerEditorSubsystem::GenerateTriangles(FScopedSlowTask& Progress)
+bool UTerrainManagerEditorSubsystem::GenerateTriangles(FScopedSlowTask& Progress)
 {
 	// Clear the triangles array
 	Progress.EnterProgressFrame(1.f, FText::FromString("Clearing Triangles..."));
@@ -417,7 +566,7 @@ void UTerrainManagerEditorSubsystem::GenerateTriangles(FScopedSlowTask& Progress
 		{
 			if(Progress.ShouldCancel())
 			{
-				return;
+				return false;
 			}
 			Triangles.Add(x + y * NumOfXVertices);
 			Triangles.Add(x + (y + 1) * NumOfXVertices);
@@ -429,22 +578,23 @@ void UTerrainManagerEditorSubsystem::GenerateTriangles(FScopedSlowTask& Progress
 		}
 		FPlatformProcess::Sleep(.5f / NumOfYVertices);
 	}
+	return true;
 }
 
 
 /**
  * Generate Tangents, Normals and create the procedural mesh
  */
-void UTerrainManagerEditorSubsystem::GenerateTangentsNormalsAndMesh(FScopedSlowTask& Progress)
+bool UTerrainManagerEditorSubsystem::GenerateTangentsNormalsAndMesh(FScopedSlowTask& Progress)
 {
 	// Clear the mesh
 	Progress.EnterProgressFrame(2.f, FText::FromString("Clearing Mesh..."));
 	FPlatformProcess::Sleep(.01f);
 	if(Progress.ShouldCancel())
 	{
-		return;
+		return false;
 	}
-	ProceduralMesh->ClearAllMeshSections();
+	TerrainActor->ProceduralMesh->ClearAllMeshSections();
 	Tangents.Empty();
 	Normals.Empty();
 
@@ -452,7 +602,7 @@ void UTerrainManagerEditorSubsystem::GenerateTangentsNormalsAndMesh(FScopedSlowT
 	FPlatformProcess::Sleep(.01f);
 	if(Progress.ShouldCancel())
 	{
-		return;
+		return false;
 	}
 	UKismetProceduralMeshLibrary::CalculateTangentsForMesh(Vertices, Triangles, UVCoords, Normals, Tangents);
 
@@ -460,9 +610,9 @@ void UTerrainManagerEditorSubsystem::GenerateTangentsNormalsAndMesh(FScopedSlowT
 	FPlatformProcess::Sleep(.01f);
 	if(Progress.ShouldCancel())
 	{
-		return;
+		return false;
 	}
-	ProceduralMesh->CreateMeshSection(
+	TerrainActor->ProceduralMesh->CreateMeshSection(
 		0,
 		Vertices,
 		Triangles,
@@ -472,7 +622,8 @@ void UTerrainManagerEditorSubsystem::GenerateTangentsNormalsAndMesh(FScopedSlowT
 		Tangents,
 		true
 	);
-	ProceduralMesh->SetMaterial(0, Material);
+	TerrainActor->ProceduralMesh->SetMaterial(0, Material);
+	return true;
 }
 
 // Curve
@@ -484,8 +635,24 @@ void UTerrainManagerEditorSubsystem::GenerateTangentsNormalsAndMesh(FScopedSlowT
  */
 void UTerrainManagerEditorSubsystem::OnCurveModified(const FAssetData& AssetData)
 {
+	if(!AssetData.IsValid())
+	{
+		return;
+	}
+
+	const auto Asset = AssetData.GetAsset();
+	if(!Asset)
+	{
+		return;
+	}
+
+	if(!CliffCurve)
+	{
+		return;
+	}
+
 	// if the asset is the curve we have
-	if(AssetData.GetAsset()->GetFName() == CliffCurve->GetFName())
+	if(Asset->GetFName() == CliffCurve->GetFName())
 	{
 		// set the dirty flag
 		bDirty = true;

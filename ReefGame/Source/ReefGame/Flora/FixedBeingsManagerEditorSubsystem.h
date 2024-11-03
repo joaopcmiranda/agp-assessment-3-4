@@ -6,13 +6,14 @@
 #include "EditorSubsystem.h"
 #include "ReefGame/Terrain/TerrainManagerEditorSubsystem.h"
 #include "FixedBeingsManagerEditorSubsystem.generated.h"
+
 class AFixedBeing;
 
 USTRUCT()
 struct FFixedBeingsParameters {
 	GENERATED_BODY()
 
-	float FixedBeingPlacingPrecision = .1f;
+	float FixedBeingPlacingPrecision = 10.f;
 	int32 FixedBeingPlacingPasses = 100;
 	float ClusterRange = 1000.f;
 };
@@ -32,6 +33,28 @@ struct FSpawnedBeing {
 	}
 };
 
+USTRUCT()
+struct FIndividualPicker {
+	GENERATED_BODY()
+
+	TArray<AFixedBeing*> Beings;
+
+	AFixedBeing* operator[](int32 const Index) const
+	{
+		if(Index < 0 || Index >= Beings.Num())
+		{
+			return nullptr;
+		}
+		return Beings[Index];
+	}
+	int32 Num() const { return Beings.Num(); }
+	void Add(AFixedBeing* const Being) { Beings.Add(Being); }
+	void Empty() { Beings.Empty(); }
+	void RemoveAt(int32 const Index) { Beings.RemoveAt(Index); }
+
+};
+
+
 
 /**
  *
@@ -50,14 +73,14 @@ class REEFGAME_API UFixedBeingsManagerEditorSubsystem : public UEditorSubsystem 
 	TArray<FSpawnedBeing> SpawnedBeings;
 
 	UPROPERTY()
-	TArray<TArray<AFixedBeing*>> Picker_Internal;
+	TArray<FIndividualPicker> Picker_Internal;
 
-	TArray<TArray<AFixedBeing*>>& GetPicker();
+	TArray<FIndividualPicker>& GetPicker();
 	void                          ClearPicker();
 	void                          DespawnToPicker();
 
 	void PlaceFixedBeingsPass(const int32& Pass, FScopedSlowTask& Progress, AActor* Parent);
-	void PlaceFixedBeingInEnvironment(const int32& Pass, int32 Y, int32 X, AActor* Parent);
+	void PlaceFixedBeingInEnvironment(const int32& Pass, float Y, float X, AActor* Parent);
 
 	bool bDirty = true;
 
@@ -67,7 +90,7 @@ class REEFGAME_API UFixedBeingsManagerEditorSubsystem : public UEditorSubsystem 
 	int32 PickerIndexSeed = Seed;
 	int32 SelectionSeed = Seed;
 	int32 Seed = 0;
-	int32 GetDeterministicStep(const int32& Pass);
+	float GetDeterministicStep(const int32& Pass, const int32 ArraySize);
 	int32 GetDeterministicPickerIndex();
 	float GetDetRand0To1();
 
@@ -76,9 +99,10 @@ public:
 	virtual void Deinitialize() override;
 	void         ClearAll();
 	void         ClearSpawned();
+	void         CheckChildren(const AActor* Parent);
 	void         SetFixedBeingsClasses(TArray<TSubclassOf<AFixedBeing>> const& NewClasses);
 	void         SetSeed(int32 NewSeed);
 
-	void RedistributeFixedBeings(FFixedBeingsParameters NewParameters, AActor* Parent);
+	void RedistributeFixedBeings(FFixedBeingsParameters NewParameters, AActor* Parent, TArray<TSubclassOf<AFixedBeing>> const& NewClasses);
 
 };

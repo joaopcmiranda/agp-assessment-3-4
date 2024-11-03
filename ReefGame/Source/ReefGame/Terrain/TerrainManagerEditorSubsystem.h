@@ -1,5 +1,10 @@
 ﻿#pragma once
 
+#include "CoreMinimal.h"
+#include "EditorSubsystem.h"
+#include "Terrain.h"
+#include "TerrainManagerEditorSubsystem.generated.h"
+
 struct FProcMeshTangent;
 class UProceduralMeshComponent;
 class UCurveVector;
@@ -40,7 +45,7 @@ class UTerrainManagerEditorSubsystem : public UEditorSubsystem {
 	UCurveVector* CliffCurve;
 
 	UPROPERTY()
-	UProceduralMeshComponent* ProceduralMesh;
+	ATerrain* TerrainActor;
 
 	UPROPERTY()
 	TArray<FVector> Vertices;
@@ -64,12 +69,12 @@ class UTerrainManagerEditorSubsystem : public UEditorSubsystem {
 	FTerrainParameters TerrainParameters;
 
 
-	float    GetNormalisedSkewedDistanceToCentre(const int32 X, const int32 Y) const;
-	float    CalculateHeight(const int32 X, const int32 Y) const;
+	float   GetNormalisedSkewedDistanceToCentre(const int32 X, const int32 Y) const;
+	float   CalculateHeight(const int32 X, const int32 Y) const;
 	FVector CalculateDisplacement(const int32 X, const int32 Y) const;
-	void     GenerateVertices(FScopedSlowTask& Progress);
-	void     GenerateTriangles(FScopedSlowTask& Progress);
-	void     GenerateTangentsNormalsAndMesh(FScopedSlowTask& Progress);
+	bool    GenerateVertices(FScopedSlowTask& Progress);
+	bool    GenerateTriangles(FScopedSlowTask& Progress);
+	bool    GenerateTangentsNormalsAndMesh(FScopedSlowTask& Progress);
 
 public:
 	int32 NumOfXVertices;
@@ -87,15 +92,16 @@ public:
 
 	void SetMaterial(UMaterialInterface* NewMaterial);
 
-	void                      SetCliffCurve(UCurveVector* NewCliffCurve);
-	FVector                   GetVertexPosition(int32 X, int32 Y) const;
-	FVector                   GetNormal(int32 X, int32 Y) const;
-	float                     GetDepthPercentage(int32 X, int32 Y) const;
-	FBox2D                    GetBoundingBox2D() const;
-	FBox                      GetBoundingBox() const;
-	bool                      IsOk() const;
-	UProceduralMeshComponent* GetTerrain() const;
-	UProceduralMeshComponent* GetTerrain(FTerrainParameters const& NewParameters, UMaterialInterface* NewMaterial, UCurveVector* NewCliffCurve);
+	void      CheckChildren(const AActor* Parent) const;
+	void      SetCliffCurve(UCurveVector* NewCliffCurve);
+	FVector   GetVertexPosition(float X, float Y) const;
+	FVector   GetNormal(float X, float Y) const;
+	float     GetDepthPercentage(float X, float Y) const;
+	FBox2D    GetBoundingBox2D() const;
+	FBox      GetBoundingBox() const;
+	bool      IsOk() const;
+	ATerrain* GetTerrain() const;
+	ATerrain* GetTerrain(FTerrainParameters const& NewParameters, UMaterialInterface* NewMaterial, UCurveVector* NewCliffCurve);
 
-	UProceduralMeshComponent* GetTerrain(FTerrainParameters const& NewParameters);
+	ATerrain* GetTerrain(FTerrainParameters const& NewParameters);
 };

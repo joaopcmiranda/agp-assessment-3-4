@@ -7,6 +7,7 @@
 #include "Terrain/TerrainManagerEditorSubsystem.h"
 #include "Environment.generated.h"
 
+class ATerrain;
 class UProceduralMeshComponent;
 struct FSpawnedBeing;
 class AFixedBeing;
@@ -24,17 +25,16 @@ public:
 
 	#if WITH_EDITOR
 
-	void OnConstruction(const FTransform& Transform);
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Environment")
 	void RegenerateTerrain();
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Environment")
 	void RegenerateFixedBeings();
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Environment")
+	void ClearFixedBeings();
 
+	virtual void OnConstruction(const FTransform& Transform) override;
 	#endif
 
-	virtual void PostLoad() override;
-	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 
 
 	UPROPERTY(EditAnywhere, Category = "Environment")
@@ -73,7 +73,7 @@ public:
 	USceneComponent* RootSceneComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UProceduralMeshComponent* TerrainMeshComponent;
+	ATerrain* TerrainActor;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Environment")
 	UMaterialInterface* TerrainMaterial;
@@ -82,7 +82,7 @@ public:
 	UCurveVector* CliffCurve;
 
 	UPROPERTY(EditAnywhere, Category="Environment")
-	float FixedBeingPlacingPrecision = 0.01f;
+	float FixedBeingPlacingPrecision = 10.f;
 	UPROPERTY(EditAnywhere, Category="Environment")
 	int32 FixedBeingPlacingPasses = 100;
 

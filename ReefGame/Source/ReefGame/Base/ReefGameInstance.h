@@ -6,7 +6,7 @@
 #include "Engine/GameInstance.h"
 #include "ReefGameInstance.generated.h"
 
-class ATerrain;
+class Terrain;
 class AFixedBeing;
 /**
  *

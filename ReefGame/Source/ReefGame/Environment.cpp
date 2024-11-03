@@ -1,8 +1,11 @@
+#pragma optimize("", off)
+
 #include "Environment.h"
 #include "Editor.h"
 #include "ProceduralMeshComponent.h"
 #include "Async/Async.h"
 #include "Flora/FixedBeingsManagerEditorSubsystem.h"
+#include "Terrain/Terrain.h"
 
 class UFixedBeingsManagerEditorSubsystem;
 
@@ -23,42 +26,15 @@ AEnvironment::AEnvironment()
 void AEnvironment::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
-	if(!TerrainMeshComponent)
+	if(auto const FBManager = GEditor->GetEditorSubsystem<UFixedBeingsManagerEditorSubsystem>())
 	{
-		RegenerateTerrain();
+		FBManager->CheckChildren(this);
 	}
-}
-
-void AEnvironment::PostLoad()
-{
-	Super::PostLoad();
-	if(!TerrainMeshComponent)
+	if(auto const TManager = GEditor->GetEditorSubsystem<UTerrainManagerEditorSubsystem>())
 	{
-		RegenerateTerrain();
-	}
-}
-
-void AEnvironment::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
-{
-	Super::PostEditChangeProperty(PropertyChangedEvent);
-
-	FName const PropertyName = (PropertyChangedEvent.Property != nullptr) ? PropertyChangedEvent.Property->GetFName() : NAME_None;
-	UE_LOG(LogTemp, Log, TEXT("Property changed: %s"), *PropertyName.ToString());
-
-	// if the FixedBeingClasses changed, let the FixedBeingsManagerEditorSubsystem know
-	if(PropertyName == GET_MEMBER_NAME_CHECKED(AEnvironment, FixedBeingsClasses))
-	{
-		auto const Manager = GEditor->GetEditorSubsystem<UFixedBeingsManagerEditorSubsystem>();
-		if(Manager)
-		{
-			Manager->SetFixedBeingsClasses(FixedBeingsClasses);
-			UE_LOG(LogTemp, Log, TEXT("FixedBeingsClasses changed"));
-		}
-	}
-
-	if(!TerrainMeshComponent)
-	{
-		RegenerateTerrain();
+		TManager->SetMaterial(TerrainMaterial);
+		TManager->SetCliffCurve(CliffCurve);
+		TManager->CheckChildren(this);
 	}
 }
 
@@ -119,8 +95,14 @@ void AEnvironment::RegenerateEnvironmentInternal()
 		return;
 	}
 
-	TerrainMeshComponent = TerrainManager->GetTerrain(GetTerrainParams(), TerrainMaterial, CliffCurve);
-	TerrainMeshComponent->AttachToComponent(RootComponent, FAttachmentTransformRules::KeepRelativeTransform);
+	TerrainActor = TerrainManager->GetTerrain(GetTerrainParams(), TerrainMaterial, CliffCurve);
+	if(!TerrainActor)
+	{
+		UE_LOG(LogTemp, Error, TEXT("TerrainActor Failed to generate"));
+		return;
+	}
+	TerrainActor->AttachToActor(this, FAttachmentTransformRules::KeepRelativeTransform);
+
 
 	// Log Bounding Box
 	UE_LOG(LogTemp, Warning, TEXT("Terrain Bounding Box: %s"), *TerrainManager->GetBoundingBox2D().ToString());
@@ -139,7 +121,8 @@ void AEnvironment::RegenerateFixedBeings()
 		UE_LOG(LogTemp, Error, TEXT("TerrainManager is not set"));
 		return;
 	}
-	if(!TerrainMeshComponent || !TerrainManager->IsOk())
+	UE_LOG(LogTemp, Log, TEXT("RegenerateFixedBeings"));
+	if(!TerrainActor || !TerrainManager->IsOk())
 	{
 		RegenerateTerrain();
 		return;
@@ -149,6 +132,17 @@ void AEnvironment::RegenerateFixedBeings()
 	{
 		RegenerateFixedBeingsInternal();
 	});
+}
+
+void AEnvironment::ClearFixedBeings()
+{
+	auto const FBManager = GEditor->GetEditorSubsystem<UFixedBeingsManagerEditorSubsystem>();
+	if(!FBManager)
+	{
+		UE_LOG(LogTemp, Error, TEXT("FBManager is not set"));
+		return;
+	}
+	FBManager->ClearSpawned();
 }
 
 
@@ -161,18 +155,15 @@ void AEnvironment::RegenerateFixedBeingsInternal()
 		UE_LOG(LogTemp, Error, TEXT("FBManager is not set"));
 		return;
 	}
-	if(!TerrainMeshComponent)
+	if(!TerrainActor)
 	{
-		UE_LOG(LogTemp, Error, TEXT("TerrainMeshComponent is not set"));
+		UE_LOG(LogTemp, Error, TEXT("TerrainActor is not set"));
 		return;
 	}
 
-	FBManager->RedistributeFixedBeings(
-		{
-			.FixedBeingPlacingPrecision = .1f,
-			.FixedBeingPlacingPasses = 100,
-			.ClusterRange = 1000.f
-		}, this);
+	FFixedBeingsParameters const Parameters{FixedBeingPlacingPrecision, FixedBeingPlacingPasses, ClusterRange};
+
+	FBManager->RedistributeFixedBeings(Parameters, this, FixedBeingsClasses);
 }
 
 
