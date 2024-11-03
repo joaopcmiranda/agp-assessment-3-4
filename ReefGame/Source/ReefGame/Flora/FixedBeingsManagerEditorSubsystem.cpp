@@ -84,10 +84,10 @@ void UFixedBeingsManagerEditorSubsystem::ClearSpawned()
 }
 
 void UFixedBeingsManagerEditorSubsystem::CheckChildren(const AActor* Parent)
-{
-	TArray<AActor*> Children;
+{;
 
-	Parent->GetAllChildActors(Children);
+	TArray<AActor*> Children;
+	Parent->GetAttachedActors(Children);
 
 	// iterate through the actors, if they are fixed beings check if they are in the SpawnedBeings or Picker_Internal, if not, destroy them
 	for(const auto& Child : Children)

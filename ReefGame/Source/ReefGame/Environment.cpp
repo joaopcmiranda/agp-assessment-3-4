@@ -32,8 +32,11 @@ void AEnvironment::OnConstruction(const FTransform& Transform)
 	}
 	if(auto const TManager = GEditor->GetEditorSubsystem<UTerrainManagerEditorSubsystem>())
 	{
-		TManager->SetMaterial(TerrainMaterial);
-		TManager->SetCliffCurve(CliffCurve);
+		if(!TManager->IsOk())
+		{
+			TManager->SetMaterial(TerrainMaterial);
+			TManager->SetCliffCurve(CliffCurve);
+		}
 		TManager->CheckChildren(this);
 	}
 }
@@ -143,6 +146,7 @@ void AEnvironment::ClearFixedBeings()
 		return;
 	}
 	FBManager->ClearSpawned();
+	FBManager->CheckChildren(this);
 }
 
 

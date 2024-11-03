@@ -49,10 +49,9 @@ void UTerrainManagerEditorSubsystem::SetMaterial(UMaterialInterface* NewMaterial
 
 void UTerrainManagerEditorSubsystem::CheckChildren(const AActor* Parent) const
 {
-	auto Children = TArray<AActor*>();
 
-	Parent->GetAllChildActors(Children);
-
+	TArray<AActor*> Children;
+	Parent->GetAttachedActors(Children);
 	// iterate through the actors, if they are ATerrain check if they match TerrainActor, if not, destrooy them
 	for(const auto& Child : Children)
 	{
