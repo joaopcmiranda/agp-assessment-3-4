@@ -4,5 +4,4 @@
 AReefGameGameModeBase::AReefGameGameModeBase()
 {
 	// Access GameStateClass within the class scope
-	GameStateClass = AFishCollection::StaticClass();
 }

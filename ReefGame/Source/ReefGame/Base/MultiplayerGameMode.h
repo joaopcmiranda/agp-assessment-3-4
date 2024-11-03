@@ -7,11 +7,12 @@
 #include "MultiplayerGameMode.generated.h"
 
 /**
- * 
+ *
  */
 UCLASS()
 class REEFGAME_API AMultiplayerGameMode : public AGameMode
 {
 	GENERATED_BODY()
-	
+
+	AMultiplayerGameMode();
 };
